@@ -1,0 +1,48 @@
+{
+  "old": {
+    "boot_ms": 984.5342139997229,
+    "selection_10_ms_samples": [
+      2240.5,
+      2175.600000000559,
+      2099.7000000001863
+    ],
+    "selection_10_ms_median": 2175.600000000559,
+    "layer_8_ms_samples": [
+      255.70000000018626,
+      227.19999999925494,
+      226.30000000074506
+    ],
+    "layer_8_ms_median": 227.19999999925494,
+    "metrics": null
+  },
+  "new": {
+    "boot_ms": 543.2007769995835,
+    "selection_10_ms_samples": [
+      8.900000000372529,
+      7.5,
+      4.1000000005587935
+    ],
+    "selection_10_ms_median": 7.5,
+    "layer_8_ms_samples": [
+      15.5,
+      9.099999999627471,
+      8.5
+    ],
+    "layer_8_ms_median": 9.099999999627471,
+    "metrics": {
+      "fullScoreRenders": 1,
+      "fastScoreRefreshes": 42,
+      "solfaRenders": 0,
+      "mixerRenders": 0,
+      "autosaves": 0,
+      "scoreEpoch": 1,
+      "renderedScoreEpoch": 1,
+      "currentView": "score"
+    }
+  },
+  "improvement_percent": {
+    "boot": 44.82662265308168,
+    "selection": 99.65526751241046,
+    "layer_switching": 95.99471831000999
+  }
+}

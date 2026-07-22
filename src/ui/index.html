@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Airmonlink Composer intelligent music notation desktop application" />
+  <title>Airmonlink Composer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="piano-hidden">
+  <div id="app" class="app-shell">
+    <header class="titlebar">
+      <div class="brand" aria-label="Airmonlink Composer">
+        <img class="brand-logo" src="../../assets/official-logo.png" alt="Airmonlink Composer official logo" />
+        <div class="brand-wordmark"><strong>Airmonlink</strong><span>Composer</span></div>
+      </div>
+      <div class="document-title"><span id="documentName">Untitled Score</span><span id="dirtyMark"></span></div>
+      <div class="title-actions">
+        <button class="icon-btn" id="themeButton" title="Toggle theme" aria-label="Toggle theme">◐</button>
+        <button class="icon-btn" id="helpButton" title="Help" aria-label="Help">?</button>
+      </div>
+    </header>
+    <div class="read-only-banner" id="readOnlyBanner" role="status">Read-only: this project is locked or the destination is not writable. Use Save As to create an editable copy.</div>
+
+    <nav class="professional-nav" aria-label="Airmonlink Composer commands">
+      <div class="menu-tabs" role="menubar" aria-label="Main menu">
+        <button class="menu-tab" data-menu="fileMenu" role="menuitem" aria-haspopup="true">File</button>
+        <button class="menu-tab" data-menu="homeMenu" role="menuitem" aria-haspopup="true">Home</button>
+        <button class="menu-tab" data-menu="viewMenu" role="menuitem" aria-haspopup="true">View</button>
+        <button class="menu-tab" data-menu="noteMenu" role="menuitem" aria-haspopup="true">Note Input</button>
+        <button class="menu-tab" data-menu="notationsMenu" role="menuitem" aria-haspopup="true">Notations</button>
+        <button class="menu-tab" data-menu="lyricsMenu" role="menuitem" aria-haspopup="true">Text and Lyrics</button>
+        <button class="menu-tab" data-menu="harmonyMenu" role="menuitem" aria-haspopup="true">Harmony and Composition</button>
+        <button class="menu-tab" data-menu="solfaMenu" role="menuitem" aria-haspopup="true">Tonic Sol-fa</button>
+        <button class="menu-tab" data-menu="instrumentsMenu" role="menuitem" aria-haspopup="true">Instruments and Staves</button>
+        <button class="menu-tab" data-menu="playbackMenu" role="menuitem" aria-haspopup="true">Playback</button>
+        <button class="menu-tab advanced-menu" data-menu="layoutMenu" role="menuitem" aria-haspopup="true">Layout</button>
+        <button class="menu-tab advanced-menu" data-menu="partsMenu" role="menuitem" aria-haspopup="true">Parts</button>
+        <button class="menu-tab advanced-menu" data-menu="pluginsMenu" role="menuitem" aria-haspopup="true">Plugins</button>
+        <button class="menu-tab" data-menu="exportMenu" role="menuitem" aria-haspopup="true">Export</button>
+        <button class="menu-tab" data-menu="helpMenu" role="menuitem" aria-haspopup="true">Help</button>
+        <button class="command-search-trigger" id="commandSearchButton" title="Search commands (Ctrl+K)" aria-label="Search commands">⌕ Commands</button>
+      </div>
+
+      <div class="menu-popovers" aria-live="polite">
+        <div class="command-popover" id="fileMenu" role="menu"><button data-command="new">New score</button><button data-command="open">Open…</button><button data-command="save">Save</button><button data-command="saveAs">Save As…</button><button data-command="recoveryCenter">Recovery Centre…</button><button data-command="export">Export…</button><button data-command="exit">Exit</button></div>
+        <div class="command-popover" id="homeMenu" role="menu"><button data-command="undo">Undo</button><button data-command="redo">Redo</button><button data-command="cut">Cut</button><button data-command="copy">Copy</button><button data-command="paste">Paste</button><button data-command="copyToLayer">Copy selection to layer…</button><button data-command="pasteReplace">Paste and replace selection…</button><button data-command="selectAllEvents">Select all events in active part</button><button id="deleteButton" data-command="delete">Delete selection</button><button id="analyzeButton" data-command="inspect">Music Inspector</button></div>
+        <div class="command-popover" id="viewMenu" role="menu"><button data-command="toggleCompositionPanel" data-panel-toggle="composition" role="menuitemcheckbox" aria-checked="true">Composition Notepad</button><button data-command="toggleInspector" data-panel-toggle="inspector" role="menuitemcheckbox" aria-checked="false">Inspector</button><button data-command="togglePianoPanel" data-panel-toggle="piano" role="menuitemcheckbox" aria-checked="false">Piano Input</button><button data-command="toggleTonicPanel" data-panel-toggle="tonic" role="menuitemcheckbox" aria-checked="false">Tonic Solfa</button><button data-command="mixerView">Mixer</button><button data-command="togglePlaybackControls" data-panel-toggle="playback" role="menuitemcheckbox" aria-checked="true">Playback controls</button><hr><button data-command="resetWorkspace">Reset Workspace Layout</button></div>
+        <div class="command-popover" id="noteMenu" role="menu"><button id="noteModeButton" data-command="noteMode">♪ Note entry</button><button id="restModeButton" data-command="restMode">𝄽 Rest entry</button><button data-command="duplicateSelection">Duplicate selected event</button><button data-command="transposeUp">Transpose up semitone</button><button data-command="transposeDown">Transpose down semitone</button></div>
+        <div class="command-popover" id="notationsMenu" role="menu"><button data-command="tie">Tie selected notes</button><button data-command="slur">Slur selected phrase</button><button data-command="removeTie">Remove tie</button><button data-command="removeSlur">Remove slur</button><button data-command="flipTie">Flip tie</button><button data-command="flipSlur">Flip slur</button><button data-command="resetSpanners">Reset tie/slur position</button><hr><button data-command="articulationStaccato">Staccato</button><button data-command="articulationTenuto">Tenuto</button><button data-command="articulationAccent">Accent</button><button data-command="articulationMarcato">Marcato</button><button data-command="articulationFermata">Fermata</button><hr><button id="measureSettingsButton" data-command="measureSettings">Bar settings</button><button id="insertMeasureButton" data-command="insertMeasure">Insert measure before</button><button data-command="insertMeasureAfter">Insert measure after</button><button id="appendMeasureButton" data-command="appendMeasure">Append measure</button><button data-command="deleteMeasure">Delete current measure</button></div>
+        <div class="command-popover" id="lyricsMenu" role="menu"><button id="lyricsModeButton" data-command="lyricsMode">Enter Lyrics</button><button id="pasteLyricsButton" data-command="pasteLyrics">Paste complete lyrics…</button><button id="copyVerseButton" data-command="copyVerse">Copy verse…</button><button id="lyricSearchButton" data-command="lyricSearch">Search and replace…</button><button id="resetLyricPositionButton" data-command="resetLyricPosition">Reset lyric position</button></div>
+        <div class="command-popover" id="harmonyMenu" role="menu"><button id="harmonizeButton" data-command="harmonize">Harmonize selection…</button><button data-command="inspect">Voice-leading inspector</button></div>
+        <div class="command-popover" id="solfaMenu" role="menu"><button id="solfaButton" data-command="solfaView">Open Tonic Sol-fa</button><button data-command="toggleSolfaOverlay">Show or hide sol-fa on staff</button><button data-command="solfaTranscription">Tonic Sol-fa transcription and validation…</button><button data-command="toggleCurrentStaffSolfa">Toggle sol-fa for current staff</button><button data-command="toggleSolfaVoiceLabels">Show or hide S/A/T/B margin labels</button><button data-command="editSelectedSolfa">Edit selected syllable…</button><button data-command="exportSolfa">Export tonic sol-fa text</button></div>
+        <div class="command-popover" id="instrumentsMenu" role="menu"><button data-command="addPart">Add instrument or staff</button><button data-command="toggleLeftPanel">Show or hide score panel</button><button data-command="toggleInspector">Show or hide Inspector</button></div>
+        <div class="command-popover" id="playbackMenu" role="menu"><button data-command="playPause">Play or Pause</button><button data-command="stop">Stop</button><button data-command="previousBeat">Previous beat</button><button data-command="nextBeat">Next beat</button><button data-command="previousMeasure">Previous measure</button><button data-command="nextMeasure">Next measure</button><button data-command="skipBackMeasures">Skip backward several measures…</button><button data-command="skipForwardMeasures">Skip forward several measures…</button><button data-command="goToMeasure">Go to measure…</button><button data-command="toggleLoop">Toggle loop</button><button data-command="setLoopStart">Set loop start here</button><button data-command="setLoopEnd">Set loop end here</button><button data-command="clearLoopRange">Clear loop range</button></div>
+        <div class="command-popover" id="layoutMenu" role="menu"><button data-command="fullScreen">Full-screen score</button><button data-command="increaseStaffSpacing">Expand staff spacing</button><button data-command="decreaseStaffSpacing">Reduce staff spacing</button><button data-command="increaseSystemSpacing">Expand system spacing</button><button data-command="decreaseSystemSpacing">Reduce system spacing</button><button data-command="resetScoreSpacing">Reset score spacing</button><button data-command="toggleLeftPanel">Toggle score sidebar</button><button data-command="toggleInspector">Toggle Inspector</button><button data-command="resetWorkspace">Reset workspace layout</button><button data-command="highContrast">Toggle high contrast</button><button data-command="reducedMotion">Toggle reduced motion</button></div>
+        <div class="command-popover" id="partsMenu" role="menu"><button data-command="scoreView">Full score</button><button data-command="mixerView">Mixer</button><button data-command="soloActivePart">Solo active part</button></div>
+        <div class="command-popover" id="pluginsMenu" role="menu"><div class="menu-information"><strong>Plugin SDK foundation</strong><span>No plugins are installed. Plugin execution remains disabled until the permission sandbox is complete.</span></div></div>
+        <div class="command-popover" id="exportMenu" role="menu"><button id="exportButton" data-command="export">Export score…</button><button data-command="exportMusicXml">MusicXML</button><button data-command="exportMxl">Compressed MusicXML</button><button data-command="exportMidi">MIDI</button><button data-command="exportSolfa">Tonic sol-fa text</button><button data-command="print">Print or PDF</button></div>
+        <div class="command-popover" id="helpMenu" role="menu"><button data-command="help">Help</button><button data-command="about">About Airmonlink Composer</button></div>
+      </div>
+
+      <div class="quick-toolbar" aria-label="Quick access toolbar">
+        <div class="quick-group">
+          <button class="quick-button primary" id="newButton" title="New score">＋</button>
+          <button class="quick-button" id="openButton" title="Open">⌂</button>
+          <button class="quick-button" id="saveButton" title="Save">▣</button>
+          <button class="quick-button" id="undoButton" title="Undo">↶</button>
+          <button class="quick-button" id="redoButton" title="Redo">↷</button>
+        </div>
+        <div class="quick-divider"></div>
+        <label class="quick-field">Duration<select id="durationSelect" aria-label="Current note duration"><option value="8">𝅜</option><option value="6">𝅝·</option><option value="4">𝅝</option><option value="3">𝅗𝅥·</option><option value="2">𝅗𝅥</option><option value="1.5">𝅘𝅥·</option><option value="1" selected>𝅘𝅥</option><option value="0.75">𝅘𝅥𝅮·</option><option value="0.5">𝅘𝅥𝅮</option><option value="0.375">𝅘𝅥𝅯·</option><option value="0.25">𝅘𝅥𝅯</option><option value="0.125">𝅘𝅥𝅰</option><option value="0.0625">𝅘𝅥𝅱</option></select></label>
+        <label class="quick-field">Layer<select id="voiceLayerSelect" aria-label="Active voice layer"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+        <span class="quick-readout" id="currentMeasureQuick">Bar 1</span>
+        <div class="quick-divider"></div>
+        <div class="transport compact-transport" aria-label="Playback controls">
+          <button class="round-btn" id="rewindButton" title="Return to start">⏮</button>
+          <button class="round-btn" id="skipBackMeasuresButton" title="Skip backward several bars">≪</button><button class="round-btn" id="previousMeasureButton" title="Previous bar">|◀</button>
+          <button class="round-btn" id="previousBeatButton" title="Previous beat">◀·</button>
+          <button class="round-btn" id="previousNoteButton" title="Previous note">◀♪</button>
+          <button class="round-btn play" id="playButton" title="Play from cursor">▶</button>
+          <button class="round-btn" id="stopButton" title="Stop">■</button>
+          <button class="round-btn" id="nextNoteButton" title="Next note">♪▶</button>
+          <button class="round-btn" id="nextBeatButton" title="Next beat">·▶</button>
+          <button class="round-btn" id="nextMeasureButton" title="Next bar">▶|</button><button class="round-btn" id="skipForwardMeasuresButton" title="Skip forward several bars">≫</button><button class="round-btn" id="goToMeasureButton" title="Go to measure">#</button>
+          <button class="round-btn" id="loopButton" title="Loop playback">↻</button>
+        </div>
+        <label class="tempo-control">♩ <input id="tempoInput" type="number" min="30" max="300" value="96" /><span>BPM</span></label>
+        <div class="quick-spacer"></div>
+        <label class="quick-field workspace-field">Workspace<select id="workspaceSelect"><option value="beginner">Beginner</option><option value="advanced">Advanced</option></select></label>
+        <span class="quick-readout" id="zoomQuick">90%</span>
+      </div>
+    </nav>
+
+    <main class="workspace">
+      <aside class="left-panel panel">
+        <div class="panel-heading"><span>Score</span><button id="addPartButton" class="mini-btn" title="Add instrument">＋</button></div>
+        <div class="score-meta-mini">
+          <div class="key-chip" id="keyChip">C major</div><div class="key-chip" id="timeChip">4/4</div>
+        </div>
+        <div id="partsList" class="parts-list"></div>
+        <div class="panel-section layer-section">
+          <div class="section-title">Voice layers</div>
+          <div id="layerButtons" class="layer-buttons"></div>
+          <small class="layer-help">Every staff has exactly four independent musical layers. Each layer has its own notes, rests, ties, lyrics, playback and tonic sol-fa.</small><div id="layerCapacityInspector" class="layer-capacity-inspector" aria-label="Layer Capacity Inspector"></div>
+        </div>
+        <div class="panel-section">
+          <div class="section-title">Views</div>
+          <button class="nav-item active" data-view="score"><span>𝄞</span>Staff notation</button>
+          <button class="nav-item" data-view="solfa"><span>d r m</span>Tonic sol-fa</button>
+          <button class="nav-item" data-view="mixer"><span>≡</span>Mixer</button>
+        </div>
+        <div class="panel-section recent-section">
+          <div class="section-title">Project status</div>
+          <div id="projectStats" class="project-stats"></div>
+          <div class="section-title recent-title">Recent projects</div>
+          <div id="recentProjects" class="recent-projects"><small>No recent desktop projects yet.</small></div>
+        </div>
+      </aside>
+
+      <section class="editor-area">
+        <div class="editor-toolbar">
+          <div class="breadcrumb"><span id="scoreTitleSmall">Untitled Score</span><span>›</span><span id="currentViewLabel">Full Score</span></div>
+          <div class="zoom-control"><button id="zoomOut">−</button><input id="zoomSlider" type="range" min="55" max="145" value="90" /><button id="zoomIn">＋</button><span id="zoomLabel">90%</span></div>
+        </div>
+        <div id="lyricsEntryStrip" class="lyrics-entry-strip">
+          <strong>Lyrics</strong>
+          <button id="previousLyricNote" type="button" class="mini-btn" title="Previous lyric note" aria-label="Previous lyric note">←</button>
+          <label>Verse <input id="quickLyricVerse" type="number" min="1" max="24" value="1" /></label>
+          <input id="quickLyricText" type="text" placeholder="Type a syllable; Space, hyphen or underscore applies and advances" />
+          <label>Syllable <select id="quickLyricSyllabic"><option value="">Automatic</option><option value="single">Single</option><option value="begin">Begin</option><option value="middle">Middle</option><option value="end">End</option></select></label>
+          <label class="checkbox-label compact-check"><input id="quickLyricMelisma" type="checkbox" /> Melisma</label>
+          <label class="checkbox-label compact-check"><input id="quickLyricAutoAdvance" type="checkbox" checked /> Auto-advance</label>
+          <button id="applyQuickLyric" class="button primary">Apply</button>
+          <button id="nextLyricNote" type="button" class="mini-btn" title="Next lyric note" aria-label="Next lyric note">→</button>
+          <small><kbd>Space</kbd> next word · <kbd>-</kbd> next syllable · <kbd>_</kbd> melisma · empty <kbd>Backspace</kbd> returns to the previous note. Visual lyric movement never changes playback.</small>
+        </div>
+        <div class="canvas-scroll" id="canvasScroll">
+          <div id="scorePage" class="score-page">
+            <div class="page-header editable-score-header" aria-label="Editable score title and publication information">
+              <h1 id="pageTitle" contenteditable="true" data-meta-field="title" spellcheck="true">Untitled Score</h1>
+              <h2 id="pageSubtitle" contenteditable="true" data-meta-field="subtitle" data-placeholder="Optional subtitle"></h2>
+              <p id="pageDedication" class="header-dedication" contenteditable="true" data-meta-field="dedication" data-placeholder="Optional dedication"></p>
+              <p id="pageComposer" class="header-composer" contenteditable="true" data-meta-field="composer" data-placeholder="Composer"></p>
+              <div class="header-credit-fields"><p id="pageCompositionDate" contenteditable="true" data-meta-field="compositionDate" data-placeholder="Composition date"></p><p id="pageArranger" contenteditable="true" data-meta-field="arranger" data-placeholder="Arranger"></p><p id="pageLyricist" contenteditable="true" data-meta-field="lyricist" data-placeholder="Lyricist"></p><p id="pageSource" contenteditable="true" data-meta-field="source" data-placeholder="Source"></p><p id="pageCopyright" contenteditable="true" data-meta-field="copyright" data-placeholder="Copyright"></p></div>
+              <p id="pageSupportingText" class="header-supporting" contenteditable="true" data-meta-field="supportingText" data-placeholder="Arranger, lyricist, date or other supporting text"></p>
+              <p id="pageMusicalMeta" class="header-musical-meta"><button type="button" data-header-edit="key">Key is C major</button><button type="button" data-header-edit="time">Time: 4/4</button><button type="button" data-header-edit="tempo">Tempo: ♩ = 96</button></p>
+            </div>
+            <div id="notationCanvas" class="notation-canvas" aria-label="Editable music score"></div>
+            <div class="page-footer"><span>Airmonlink Composer</span><span id="pageNumber">1</span></div>
+          </div>
+          <div id="solfaEditorToolbar" class="solfa-editor-toolbar hidden" aria-label="Tonic Sol-fa display controls">
+            <label>Display<select id="solfaLabelSelect"><option value="short">Abbreviated d r m</option><option value="long">Full syllables</option><option value="degrees">Scale degrees</option><option value="notes">Note names</option></select></label>
+            <label>Position<select id="solfaOverlayPosition"><option value="below">Below staff</option><option value="above">Above staff</option></select></label>
+            <label>Scope<select id="solfaOverlayScope"><option value="entire-score">Entire score</option><option value="current-staff">Current staff</option><option value="selected-staves">Selected staves</option></select></label>
+            <label>Pitch<select id="solfaPitchSystem"><option value="movable-do">Movable-do</option><option value="fixed-do">Fixed-do</option></select></label>
+            <label>Minor<select id="solfaMinorSystem"><option value="do-based">Do-based minor</option><option value="la-based">La-based minor</option></select></label>
+            <label>Font<input id="solfaFontSize" type="number" min="6" max="18" value="8" /></label>
+            <label>Spacing<input id="solfaVerticalSpacing" type="number" min="4" max="40" value="12" /></label>
+            <label class="checkbox-label"><input id="solfaLyricsToggle" type="checkbox" checked /> Lyrics</label>
+            <label class="checkbox-label"><input id="solfaRhythmToggle" type="checkbox" checked /> Rhythm</label>
+            <label class="checkbox-label"><input id="solfaOctaveToggle" type="checkbox" checked /> Octaves</label>
+            <label class="checkbox-label"><input id="solfaWarningsToggle" type="checkbox" checked /> Warnings</label>
+            <label class="checkbox-label"><input id="solfaVoiceLabelsToggle" type="checkbox" /> S/A/T/B</label>
+            <label class="checkbox-label"><input id="solfaEmptyLayersToggle" type="checkbox" /> Empty layers</label>
+            <label class="checkbox-label"><input id="solfaOverlayToggle" type="checkbox" /> On staff</label>
+            <button id="toggleCurrentStaffSolfa" type="button" class="button subtle">Current staff</button>
+            <button id="openSolfaTranscription" type="button" class="button subtle">Parse / convert…</button>
+            <span class="solfa-fit-controls" role="group" aria-label="Tonic Sol-fa page zoom"><button id="solfaFitWidth" type="button">Fit Width</button><button id="solfaFitPage" type="button">Fit Page</button><button id="solfaActualSize" type="button">100%</button></span>
+          </div>
+          <div id="solfaPage" class="solfa-pages hidden" data-fit-mode="width">
+           <article id="solfaFirstPage" class="score-page solfa-sheet" data-solfa-page="1">
+            <div class="page-header solfa-publication-header">
+              <h1 id="solfaTitle" contenteditable="true" data-meta-field="title">Untitled Score</h1>
+              <p id="solfaDedication" class="solfa-dedication" contenteditable="true" data-meta-field="dedication"></p>
+              <div class="solfa-credit-grid">
+                <div id="solfaMusicalMeta" class="solfa-musical-meta"><span id="solfaKeyLine"></span><span id="solfaTimeLine"></span><span id="solfaTempoLine"></span></div>
+                <div class="solfa-right-credits"><p id="solfaComposer" contenteditable="true" data-meta-field="composer"></p><p id="solfaDate" contenteditable="true" data-meta-field="compositionDate"></p><p id="solfaArranger" contenteditable="true" data-meta-field="arranger"></p><p id="solfaLyricist" contenteditable="true" data-meta-field="lyricist"></p><p id="solfaSource" contenteditable="true" data-meta-field="source"></p><p id="solfaSupporting" contenteditable="true" data-meta-field="supportingText"></p><p id="solfaCopyright" contenteditable="true" data-meta-field="copyright"></p></div>
+              </div>
+              <div class="solfa-convention-note" id="solfaConventionNote">Airmonlink Traditional Tonic Sol-fa: symbols are interpreted by context and positioned from musical time.</div>
+            </div>
+            <select id="solfaModeSelect" hidden aria-hidden="true"><option value="traditional">Traditional</option></select>
+            <div id="solfaContent" class="solfa-content"></div>
+            <div class="page-footer"><span>Airmonlink Composer • Tonic Sol-fa</span><span class="solfa-page-number">1</span></div>
+           </article>
+          </div>
+          <div id="mixerPage" class="mixer-page hidden"><div class="mixer-header"><h2>Score Mixer</h2><p>Balance, mute, solo and position every part.</p></div><div id="mixerContent" class="mixer-content"></div></div>
+        </div>
+        <div id="playheadStatus" class="playhead-status">
+          <span id="statusText">Ready</span>
+          <div class="timeline-wrap">
+            <span id="timelineStart">1:1</span>
+            <input id="playbackSeek" type="range" min="0" max="32" step="0.0625" value="0" aria-label="Playback position" />
+            <span id="timelineEnd">8:4</span>
+          </div>
+          <span id="cursorPosition">Bar 1 • Beat 1</span>
+          <div id="musicalStatus" class="musical-status" aria-label="Current editing status">
+            <span id="statusPart">Part: —</span><span id="statusStaff">Staff: —</span><span id="statusLayer">Layer 1</span><span id="statusMeasure">Bar 1</span><span id="statusKey">Key: C</span><span id="statusTime">Time: 4/4</span><span id="statusDuration">Quarter</span><span id="statusDirty">Saved</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right-panel panel" id="rightDock" aria-label="Managed right-side panels">
+        <div id="rightDockResizeHandle" class="dock-resize-handle" aria-label="Resize right panels"></div>
+        <div class="dock-tabbar" role="tablist" aria-label="Right-side panels">
+          <button class="dock-tab active" data-dock-tab="composition" role="tab" aria-selected="true">Composition Notepad</button>
+          <button class="dock-tab hidden" data-dock-tab="inspector" role="tab" aria-selected="false">Inspector</button>
+          <button class="dock-tab hidden" data-dock-tab="tonic" role="tab" aria-selected="false">Tonic Solfa</button>
+          <button id="collapseRightDock" class="mini-btn dock-collapse" title="Collapse right panels" aria-label="Collapse right panels">›</button>
+        </div>
+        <section id="compositionPanel" class="dock-panel active" data-dock-panel="composition" role="tabpanel">
+          <div class="panel-heading"><span>Composition Notepad</span><span class="panel-window-actions"><button class="mini-btn" data-float-panel="composition" title="Float or redock Composition Notepad">↗</button><button class="mini-btn" data-close-panel="composition" title="Close Composition Notepad">×</button></span></div>
+          <div class="composition-groups">
+            <details open><summary>NOTE ENTRY</summary>
+        <div id="entryKeypadWindow" class="panel-section simple-entry-section" aria-label="Simple Entry keypad">
+          <div id="entryKeypadHandle" class="entry-keypad-header">
+            <div><span class="section-title">Simple Entry</span><small id="entryKeypadModeLabel">Composition Notepad symbol keypad</small></div>
+            <div class="entry-keypad-window-buttons">
+              <button id="chordEntryButton" type="button" data-command="toggleChordEntry" title="Chord entry: keep the caret on the same beat" aria-label="Toggle chord entry" aria-pressed="false">♬</button>
+              <button id="entryKeypadFloatButton" type="button" title="Float or dock the Simple Entry keypad" aria-label="Float or dock Simple Entry keypad">↗</button>
+              <button id="entryKeypadCollapseButton" type="button" title="Collapse or expand the Simple Entry keypad" aria-label="Collapse or expand Simple Entry keypad">−</button>
+            </div>
+          </div>
+          <div class="entry-keypad-body">
+            <div id="simpleEntryPalette" class="simple-entry-palette" aria-label="Symbol-based Simple Entry palette">
+              <button data-entry-mode="note" title="Note entry (N)" aria-label="Note entry">♪</button><button data-entry-mode="rest" title="Rest entry (R)" aria-label="Rest entry">𝄽</button>
+              <button data-duration="8" title="Breve — shortcut 0" aria-label="Breve">𝅜</button><button data-duration="4" title="Whole note — shortcut 1" aria-label="Whole note">𝅝</button><button data-duration="2" title="Half note — shortcut 2" aria-label="Half note">𝅗𝅥</button><button data-duration="1" title="Quarter note — shortcut 3" aria-label="Quarter note">𝅘𝅥</button><button data-duration="0.5" title="Eighth note — shortcut 4" aria-label="Eighth note">𝅘𝅥𝅮</button><button data-duration="0.25" title="Sixteenth note — shortcut 5" aria-label="Sixteenth note">𝅘𝅥𝅯</button><button data-duration="0.125" title="Thirty-second note — shortcut 6" aria-label="Thirty-second note">𝅘𝅥𝅰</button><button data-duration="0.0625" title="Sixty-fourth note — shortcut 7" aria-label="Sixty-fourth note">𝅘𝅥𝅱</button>
+              <button data-command="dotDuration" title="Add dot (.)" aria-label="Add dot">·</button><button data-command="doubleDotDuration" title="Add double dot" aria-label="Add double dot">··</button><button data-command="accidentalSharp" title="Sharp (+)" aria-label="Sharp">♯</button><button data-command="accidentalFlat" title="Flat (-)" aria-label="Flat">♭</button><button data-command="accidentalNatural" title="Natural (=)" aria-label="Natural">♮</button><button data-command="tie" title="Tie selected notes (T)" aria-label="Tie">⌒</button><button data-command="slur" title="Slur selected phrase" aria-label="Slur">◡</button><button data-command="lyricsMode" title="Lyrics mode (L)" aria-label="Add lyrics">𝄫</button><button data-entry-mode="eraser" title="Eraser" aria-label="Eraser">⌫</button>
+              <button data-layer="1" title="Layer 1 — Alt+1" aria-label="Layer 1">①</button><button data-layer="2" title="Layer 2 — Alt+2" aria-label="Layer 2">②</button><button data-layer="3" title="Layer 3 — Alt+3" aria-label="Layer 3">③</button><button data-layer="4" title="Layer 4 — Alt+4" aria-label="Layer 4">④</button>
+            </div>
+            <div id="notationCaretReadout" class="notation-caret-readout">Caret: Bar 1 · Beat 1 · Layer 1</div>
+            <div class="midi-step-controls"><select id="midiDeviceSelect" aria-label="MIDI input device"><option value="">MIDI keyboard…</option></select><button id="connectMidiButton" type="button">Connect MIDI</button><span id="midiStatus" role="status">Not connected</span></div>
+          </div>
+        </div>
+            </details>
+            <details><summary>PITCH AND TONALITY</summary><div class="composition-command-grid"><button data-command="accidentalSharp">♯ Sharp</button><button data-command="accidentalFlat">♭ Flat</button><button data-command="accidentalNatural">♮ Natural</button><button data-command="transposeUp">Transpose ↑</button><button data-command="transposeDown">Transpose ↓</button><button data-command="addIntervalAbove">Add interval ↑</button><button data-command="addIntervalBelow">Add interval ↓</button><button data-command="measureSettings">Key / measure settings</button></div></details>
+            <details><summary>RHYTHM AND MEASURES</summary><div class="composition-command-grid"><button data-command="measureSettings">Time signature</button><button data-command="configurePickup">Pickup / anacrusis</button><button data-command="insertMeasure">Insert measure</button><button data-command="appendMeasure">Append measure</button><button data-command="deleteMeasure">Delete measure</button><button data-command="tie">Tie</button></div></details>
+            <details><summary>EXPRESSION</summary><div class="composition-command-grid"><button data-command="articulationStaccato">Staccato</button><button data-command="articulationTenuto">Tenuto</button><button data-command="articulationAccent">Accent</button><button data-command="articulationFermata">Fermata</button><button data-command="harmonize">Harmonize</button></div></details>
+            <details><summary>TEXT</summary><div class="composition-command-grid"><button data-command="lyricsMode">Lyrics</button><button data-command="addStaffText">Staff text</button><button data-command="addSystemText">System text</button><button data-command="addRehearsalText">Rehearsal mark</button><button data-command="scoreProperties">Title / composer / date</button></div></details>
+            <details><summary>STAFF AND INSTRUMENTS</summary><div class="composition-command-grid"><button data-command="addPart">Add instrument</button><button data-command="increaseStaffSpacing">Expand staff</button><button data-command="decreaseStaffSpacing">Reduce staff</button><button data-command="optimizeCurrentSystem">Optimize system</button><button data-command="optimizeSelection">Optimize selection</button><button data-command="optimizeScore">Optimize score</button><button data-command="resetScoreSpacing">Reset spacing</button></div></details>
+            <details><summary>TONIC SOLFA</summary><div class="composition-command-grid"><button data-command="solfaView">Dedicated Tonic Sol-fa</button><button data-command="toggleSolfaOverlay">Show on staff</button><button data-command="solfaTranscription">Parse / convert</button><button data-command="toggleCurrentStaffSolfa">Current staff</button></div></details>
+          </div>
+        </section>
+        <section id="inspectorPanel" class="dock-panel hidden" data-dock-panel="inspector" role="tabpanel">
+          <div class="panel-heading"><span>Inspector</span><span class="panel-window-actions"><button class="mini-btn" data-float-panel="inspector" title="Float or redock Inspector">↗</button><button id="closeInspector" class="mini-btn" data-close-panel="inspector">×</button></span></div>
+        <div id="inspectorEmpty" class="inspector-empty"><div class="empty-icon">♪</div><strong>Select a note</strong><p>Click a note to edit pitch, duration, lyric, velocity and timing.</p></div>
+        <div id="noteInspector" class="inspector-form hidden">
+          <div class="inspector-badge">Selected note</div>
+          <label>Pitch<input id="inspectorPitch" type="text" /></label>
+          <label>Start beat<input id="inspectorStart" type="number" min="0" step="0.25" /></label>
+          <label>Duration<select id="inspectorDuration">
+            <option value="8">Breve</option><option value="6">Dotted whole</option><option value="4">Whole</option><option value="3">Dotted half</option><option value="2">Half</option><option value="1.5">Dotted quarter</option><option value="1">Quarter</option><option value="0.75">Dotted eighth</option><option value="0.5">Eighth</option><option value="0.375">Dotted 16th</option><option value="0.25">16th</option><option value="0.125">32nd</option><option value="0.0625">64th</option>
+          </select></label>
+          <label>Voice layer<select id="inspectorVoice"><option value="1">Layer 1</option><option value="2">Layer 2</option><option value="3">Layer 3</option><option value="4">Layer 4</option></select></label>
+          <label>Lyric / syllable<input id="inspectorLyric" type="text" placeholder="Type lyric beneath note" /></label>
+          <div class="field-grid"><label>Verse<input id="inspectorLyricVerse" type="number" min="1" max="12" value="1" /></label><label>Syllable<select id="inspectorSyllabic"><option value="">Automatic</option><option value="single">Single</option><option value="begin">Begin</option><option value="middle">Middle</option><option value="end">End</option></select></label></div>
+          <div class="field-grid"><label>Lyric X<input id="inspectorLyricX" type="number" step="1" value="0" /></label><label>Lyric Y<input id="inspectorLyricY" type="number" step="1" value="0" /></label></div>
+          <label class="checkbox-label"><input id="inspectorMelisma" type="checkbox" /> Extend lyric under following notes (melisma)</label>
+          <label>Velocity<input id="inspectorVelocity" type="range" min="1" max="127" /></label>
+          <div class="button-row"><button id="applyInspector" class="button primary">Apply</button><button id="removeInspector" class="button danger">Delete</button></div>
+        </div>
+        <div class="panel-section properties-section">
+          <div class="section-title">Score properties</div>
+          <label>Title<input id="metaTitle" type="text" /></label>
+          <label>Composer<input id="metaComposer" type="text" /></label><label>Composition date<input id="metaCompositionDate" type="text" placeholder="YYYY-MM-DD or descriptive date" /></label><label>Subtitle<input id="metaSubtitle" type="text" /></label><label>Lyricist<input id="metaLyricist" type="text" /></label><label>Arranger<input id="metaArranger" type="text" /></label><label>Source<input id="metaSource" type="text" /></label><label>Supporting text<textarea id="metaSupportingText" rows="3"></textarea></label>
+          <div class="field-grid"><label>Key<select id="metaKey"><option>C</option><option>G</option><option>D</option><option>A</option><option>E</option><option>F</option><option>Bb</option><option>Eb</option><option>Ab</option><option>Am</option><option>Em</option><option>Dm</option><option>Gm</option></select></label><label>Time<input id="metaTime" list="timeSignatureOptions" value="4/4" inputmode="numeric" placeholder="e.g. 7/8" /></label></div>
+          <button id="applyProperties" class="button full">Update score</button>
+        </div>
+
+        </section>
+        <section id="tonicPanel" class="dock-panel hidden" data-dock-panel="tonic" role="tabpanel">
+          <div class="panel-heading"><span>Tonic Solfa</span><span class="panel-window-actions"><button class="mini-btn" data-float-panel="tonic" title="Float or redock Tonic Solfa panel">↗</button><button class="mini-btn" data-close-panel="tonic">×</button></span></div>
+          <div class="panel-section tonic-panel-content"><p>The dedicated Tonic Sol-fa page and the optional staff lane use the same musical events.</p><button class="button full" data-command="solfaView">Open dedicated Tonic Sol-fa</button><button class="button full" data-command="toggleSolfaOverlay">Show / hide on staff</button><button class="button full" data-command="solfaTranscription">Parse or convert…</button><button class="button full" data-command="toggleCurrentStaffSolfa">Toggle current staff</button><div id="tonicPanelStatus" class="panel-status">Staff overlay is hidden.</div></div>
+        </section>
+      </aside>
+    </main>
+
+    <section class="piano-dock hidden" id="pianoDock">
+      <div id="pianoDockResizeHandle" class="piano-resize-handle" aria-label="Resize Piano Input panel"></div>
+      <div class="piano-dock-title"><span>Virtual Piano</span><span id="entryHint">Click a key or click directly on a staff</span><button id="togglePiano" class="mini-btn">⌄</button></div>
+      <div id="pianoKeyboard" class="piano-keyboard"></div>
+    </section>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden"></div>
+  <dialog id="newScoreDialog" class="modal wide new-score-modal">
+    <form method="dialog" id="newScoreForm" novalidate>
+      <div class="modal-header"><div><span class="eyebrow">Guided project setup</span><h2>New Score</h2></div><button value="cancel" class="close-btn">×</button></div>
+      <nav class="wizard-steps" aria-label="New Score steps">
+        <button type="button" data-wizard-step="0" class="active"><span>1</span>Template</button>
+        <button type="button" data-wizard-step="1"><span>2</span>Music & page</button>
+        <button type="button" data-wizard-step="2"><span>3</span>Title & credits</button>
+        <button type="button" data-wizard-step="3"><span>4</span>Review</button>
+      </nav>
+      <div class="modal-body new-score-wizard-body">
+        <section class="wizard-content">
+          <div class="wizard-page active" data-wizard-page="0">
+            <div class="wizard-page-heading"><h3>Choose a starting score</h3><p>The template creates real instruments and staves; every staff still has exactly four independent layers.</p></div>
+            <div class="template-grid">
+              <label class="template-card selected"><input type="radio" name="template" value="satb" checked /><span class="template-icon">♬</span><strong>SATB Choir</strong><small>Four vocal parts</small></label>
+              <label class="template-card"><input type="radio" name="template" value="piano" /><span class="template-icon">♩</span><strong>Piano</strong><small>Keyboard grand staff</small></label>
+              <label class="template-card"><input type="radio" name="template" value="lead" /><span class="template-icon">♪</span><strong>Lead Sheet</strong><small>Melody and chords</small></label>
+              <label class="template-card"><input type="radio" name="template" value="hymn" /><span class="template-icon">𝄞</span><strong>Hymn</strong><small>SATB hymn foundation</small></label>
+              <label class="template-card"><input type="radio" name="template" value="voice-piano" /><span class="template-icon">♬</span><strong>Voice and Piano</strong><small>Vocal staff and grand staff</small></label>
+              <label class="template-card"><input type="radio" name="template" value="ssa" /><span class="template-icon">S</span><strong>SSA Choir</strong><small>Three upper voices</small></label>
+              <label class="template-card"><input type="radio" name="template" value="ttbb" /><span class="template-icon">T</span><strong>TTBB Choir</strong><small>Four lower voices</small></label>
+              <label class="template-card"><input type="radio" name="template" value="solo" /><span class="template-icon">♪</span><strong>Solo Melody</strong><small>One melodic staff</small></label>
+              <label class="template-card"><input type="radio" name="template" value="organ" /><span class="template-icon">♬</span><strong>Organ</strong><small>Grand staff foundation</small></label>
+              <label class="template-card"><input type="radio" name="template" value="string-quartet" /><span class="template-icon">𝄢</span><strong>String Quartet</strong><small>Four strings</small></label>
+              <label class="template-card"><input type="radio" name="template" value="concert-band" /><span class="template-icon">♬</span><strong>Concert Band</strong><small>Woodwinds, brass and percussion</small></label>
+              <label class="template-card"><input type="radio" name="template" value="brass-band" /><span class="template-icon">♭</span><strong>Brass Band</strong><small>Prepared brass ensemble</small></label>
+              <label class="template-card"><input type="radio" name="template" value="jazz-band" /><span class="template-icon">♯</span><strong>Jazz Band</strong><small>Saxes, brass and rhythm</small></label>
+              <label class="template-card"><input type="radio" name="template" value="worship-band" /><span class="template-icon">♫</span><strong>Worship Band</strong><small>Voice and rhythm section</small></label>
+              <label class="template-card"><input type="radio" name="template" value="african-percussion" /><span class="template-icon">◉</span><strong>African Percussion</strong><small>Four percussion staves</small></label>
+              <label class="template-card"><input type="radio" name="template" value="orchestra" /><span class="template-icon">♫</span><strong>Orchestra</strong><small>Prepared orchestral score</small></label>
+              <label class="template-card"><input type="radio" name="template" value="custom" /><span class="template-icon">＋</span><strong>Custom Ensemble</strong><small>Choose your own staves</small></label>
+            </div>
+          </div>
+          <div class="wizard-page" data-wizard-page="1">
+            <div class="wizard-page-heading"><h3>Set up the music and page</h3><p>These values create the actual measure structure and printed page. They remain editable later.</p></div>
+            <div class="time-signature-quick" aria-label="Common time signatures">
+              <button type="button" data-time-signature="2/4">2<br><span>4</span></button><button type="button" data-time-signature="3/4">3<br><span>4</span></button><button type="button" data-time-signature="4/4" class="active">4<br><span>4</span></button><button type="button" data-time-signature="6/8">6<br><span>8</span></button><button type="button" data-time-signature="9/8">9<br><span>8</span></button><button type="button" data-time-signature="12/8">12<br><span>8</span></button>
+            </div>
+            <div class="form-grid">
+              <label>Key<select name="key"><option>C</option><option>G</option><option>D</option><option>A</option><option>E</option><option>F</option><option>Bb</option><option>Eb</option><option>Ab</option><option>Am</option><option>Em</option><option>Dm</option><option>Gm</option></select></label>
+              <label>Time signature<input name="timeSignature" list="timeSignatureOptions" value="4/4" inputmode="numeric" placeholder="e.g. 7/8" /></label>
+              <label>Tempo<input name="tempo" type="number" value="96" min="30" max="300" /></label>
+              <label>Measures<input name="measures" type="number" value="16" min="1" max="2000" /></label>
+              <label>Pickup beats<input name="pickupBeats" type="number" value="0" min="0" step="0.0625" /></label>
+              <label>Initial number of staves<input name="staffCount" type="number" value="4" min="1" max="64" /></label>
+              <label>Page size<select name="pageSize"><option>A4</option><option>Letter</option><option>Legal</option><option>A3</option></select></label>
+              <label>Orientation<select name="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+              <label>Margins (mm)<input name="margins" type="number" min="5" max="40" value="15" /></label>
+              <label>Pitch view<select name="concertPitch"><option value="true">Concert pitch</option><option value="false">Transposed pitch</option></select></label>
+              <label>Initial layers<select name="initialLayers"><option value="4">4 independent layers</option></select></label>
+              <label class="checkbox-label"><input name="autoFillRests" type="checkbox" checked /> Calculate omitted rests</label>
+              <label class="span-2">Custom instruments (comma-separated keys)<input name="instrumentList" placeholder="piano, violin, flute, trumpet, cello" /></label>
+            </div>
+          </div>
+          <div class="wizard-page" data-wizard-page="2">
+            <div class="wizard-page-heading"><h3>Add title and publication credits</h3><p>These editable fields appear above both staff notation and the optional tonic-sol-fa publication.</p></div>
+            <div class="form-grid">
+              <label class="span-2">Title<input name="title" value="My New Composition" /></label>
+              <label class="span-2">Subtitle<input name="subtitle" placeholder="Optional movement or song subtitle" /></label>
+              <label>Composer<input name="composer" /></label><label>Composition date<input name="compositionDate" placeholder="YYYY-MM-DD or descriptive date" /></label>
+              <label>Arranger<input name="arranger" /></label><label>Lyricist<input name="lyricist" /></label>
+              <label>Copyright<input name="copyright" /></label><label>Source<input name="source" /></label>
+              <label class="span-2">Dedication<input name="dedication" placeholder="Optional dedication above the score" /></label>
+              <label class="span-2">Supporting text<textarea name="supportingText" rows="3" placeholder="Date, location, publication note or smaller text under the composer"></textarea></label>
+            </div>
+          </div>
+          <div class="wizard-page" data-wizard-page="3">
+            <div class="wizard-page-heading"><h3>Review before creating</h3><p>The review describes the real project that will be generated. Staff notation opens cleanly with tonic sol-fa hidden until the user enables it.</p></div>
+            <div id="newScoreReview" class="new-score-review"></div>
+          </div>
+        </section>
+        <aside class="wizard-preview-panel" aria-label="Live score preview">
+          <div class="wizard-preview-caption"><strong>Live page preview</strong><small id="wizardPreviewPageLabel">A4 · Portrait</small></div>
+          <div id="wizardPreviewSheet" class="wizard-preview-sheet">
+            <h4 id="wizardPreviewTitle">My New Composition</h4><p id="wizardPreviewSubtitle"></p>
+            <div class="wizard-preview-credits"><span id="wizardPreviewDedication"></span><span><strong id="wizardPreviewComposer"></strong><small id="wizardPreviewSupporting"></small></span></div>
+            <div id="wizardPreviewMusicalMeta" class="wizard-preview-meta">Key is C · Time 4/4 · ♩ = 96</div>
+            <div id="wizardPreviewStaves" class="wizard-preview-staves"></div>
+          </div>
+        </aside>
+      </div>
+      <div class="modal-footer wizard-footer"><span id="wizardValidation" role="status"></span><div class="wizard-footer-actions"><button id="wizardBack" type="button" class="button" hidden>Back</button><button value="cancel" class="button">Cancel</button><button id="wizardNext" type="button" class="button primary">Next</button><button id="createScoreButton" type="button" class="button primary" hidden>Create score</button></div></div>
+    </form>
+  </dialog>
+
+  <dialog id="harmonyDialog" class="modal wide">
+    <div class="modal-header"><div><span class="eyebrow">Intelligent arrangement</span><h2>Four-Part Harmonization</h2></div><button class="close-btn" data-close-dialog="harmonyDialog">×</button></div>
+    <div class="modal-body"><div class="harmony-options">
+      <label>Melody part<select id="harmonySource"></select></label>
+      <label>Source staff<select id="harmonySourceStaff"><option value="all">All / only staff</option><option value="treble">Treble staff</option><option value="bass">Bass staff</option></select></label>
+      <label>Source layer<select id="harmonySourceLayer"><option value="1">Layer 1</option><option value="2">Layer 2</option><option value="3">Layer 3</option><option value="4">Layer 4</option><option value="all">All layers</option></select></label>
+      <label>Melody role<select id="harmonyVoice"><option value="soprano">Soprano</option><option value="alto">Alto</option><option value="tenor">Tenor</option><option value="bass">Bass</option></select></label>
+      <label>Harmony destination<select id="harmonyDestination"><option value="same-layers">Same staff, separate layers</option><option value="same-grand">Same piano grand staff</option><option value="satb-parts">SATB staves</option><option value="new-staves">Add new harmony staves</option></select></label>
+      <label>Preferred style<select id="harmonyStyle"><option value="hymn">Hymn</option><option value="classical">Classical chorale</option><option value="gospel">Gospel</option><option value="worship">Contemporary worship</option><option value="simple">Simple school harmony</option></select></label>
+      <button id="generateHarmony" class="button primary">Generate 3 alternatives</button></div><div id="harmonyResults" class="harmony-results"><div class="empty-results">Choose a staff and layer, then generate alternatives.</div></div></div>
+  </dialog>
+
+
+  <dialog id="measureDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Measure structure</span><h2>Bar Settings</h2></div><button class="close-btn" data-close-dialog="measureDialog">×</button></div>
+    <div class="modal-body form-grid">
+      <label>Measure number<input id="measureNumberInput" type="number" min="1" value="1" /></label>
+      <label>Time signature<input id="measureTimeInput" list="timeSignatureOptions" placeholder="leave empty to continue previous" /></label>
+      <label>Key change<select id="measureKeyInput"><option value="">Continue previous</option><option>C</option><option>G</option><option>D</option><option>A</option><option>E</option><option>F</option><option>Bb</option><option>Eb</option><option>Ab</option><option>Am</option><option>Em</option><option>Dm</option><option>Gm</option></select></label>
+      <label>Repeat count<input id="measureRepeatTimes" type="number" min="2" max="16" value="2" /></label>
+      <label class="checkbox-label"><input id="measureRepeatStart" type="checkbox" /> Start repeat 𝄆</label>
+      <label class="checkbox-label"><input id="measureRepeatEnd" type="checkbox" /> End repeat 𝄇</label>
+      <label class="checkbox-label"><input id="measureNewSystem" type="checkbox" /> Start new system</label>
+      <label class="checkbox-label"><input id="measureNewPage" type="checkbox" /> Start new page</label>
+      <label class="span-2">Volta endings<input id="measureEndings" placeholder="1 or 2 or 1,2" /></label>
+      <label class="span-2">Rehearsal mark<input id="measureRehearsal" placeholder="A, B, Chorus..." /></label>
+    </div>
+    <div class="modal-footer"><button class="button" data-close-dialog="measureDialog">Cancel</button><button id="applyMeasureSettings" class="button primary">Apply to bar</button></div>
+  </dialog>
+
+  <dialog id="exportDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Publish and exchange</span><h2>Export Score</h2></div><button class="close-btn" data-close-dialog="exportDialog">×</button></div>
+    <div class="modal-body"><div class="export-grid">
+      <button data-export="musicxml" class="export-card"><span>XML</span><strong>MusicXML</strong><small>Exchange editable notation</small></button>
+      <button data-export="mxl" class="export-card"><span>MXL</span><strong>Compressed MusicXML</strong><small>Portable compressed exchange</small></button>
+      <button data-export="midi" class="export-card"><span>MIDI</span><strong>Standard MIDI</strong><small>Playback and DAW exchange</small></button>
+      <button data-export="solfa" class="export-card"><span>d r m</span><strong>Tonic Sol-fa</strong><small>Plain-text publication</small></button>
+      <button data-export="svg" class="export-card"><span>SVG</span><strong>Vector Score</strong><small>High-quality image</small></button>
+      <button data-export="print" class="export-card"><span>PDF</span><strong>Print / PDF</strong><small>Use system PDF printer</small></button>
+      <button data-export="airscore" class="export-card"><span>AIR</span><strong>.airscore Copy</strong><small>Editable project file</small></button>
+    </div></div>
+  </dialog>
+
+  <dialog id="copyLayerDialog" class="modal" aria-labelledby="copyLayerTitle">
+    <div class="modal-header"><div><span class="eyebrow">Independent voice layers</span><h2 id="copyLayerTitle">Copy Selection to Layer</h2></div><button class="close-btn" data-close-dialog="copyLayerDialog">×</button></div>
+    <div class="modal-body form-grid"><label>Destination layer<select id="copyLayerTarget"><option value="1">Layer 1</option><option value="2">Layer 2</option><option value="3">Layer 3</option><option value="4">Layer 4</option></select></label><label>When music already exists<select id="copyLayerConflict"><option value="replace-conflicts">Replace conflicting notes</option><option value="merge">Merge compatible chord notes</option><option value="shift-existing">Shift existing music forward</option><option value="cancel">Cancel on conflict</option></select></label><label class="checkbox-label"><input id="copyLayerLyrics" type="checkbox" checked /> Include lyrics</label><label class="checkbox-label"><input id="copyLayerMarkings" type="checkbox" checked /> Include markings and spanners</label></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="copyLayerDialog">Cancel</button><button id="applyCopyLayer" class="button primary">Copy to layer</button></div>
+  </dialog>
+
+  <dialog id="pasteReplaceDialog" class="modal" aria-labelledby="pasteReplaceTitle">
+    <div class="modal-header"><div><span class="eyebrow">Passage override</span><h2 id="pasteReplaceTitle">Paste and Replace Selection</h2></div><button class="close-btn" data-close-dialog="pasteReplaceDialog">×</button></div>
+    <div class="modal-body form-grid"><label>Replacement content<select id="pasteReplaceMode"><option value="all">Notes, rhythm, lyrics and markings</option><option value="pitch-only">Pitches only; preserve destination rhythm</option><option value="rhythm-only">Rhythm only; preserve destination pitches</option></select></label><label class="checkbox-label"><input id="pasteReplaceLyrics" type="checkbox" checked /> Include copied lyrics</label><label class="checkbox-label"><input id="pasteReplaceMarkings" type="checkbox" checked /> Include copied markings and spanners</label><p class="span-2">The complete replacement is one Undo/Redo transaction. Calculated rests are regenerated independently in the destination layer.</p></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="pasteReplaceDialog">Cancel</button><button id="applyPasteReplace" class="button primary">Replace selected passage</button></div>
+  </dialog>
+
+  <dialog id="goMeasureDialog" class="modal" aria-labelledby="goMeasureTitle">
+    <div class="modal-header"><div><span class="eyebrow">Playback navigation</span><h2 id="goMeasureTitle">Go to Measure</h2></div><button class="close-btn" data-close-dialog="goMeasureDialog">×</button></div>
+    <div class="modal-body form-grid"><label>Measure number<input id="goMeasureNumber" type="number" min="1" value="1" /></label><label>Skip count<input id="measureSkipCount" type="number" min="2" max="64" value="4" /></label><label>Navigation mode<select id="playbackNavigationMode"><option value="written">Written score</option><option value="performance">Performance order with repeats</option></select></label></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="goMeasureDialog">Cancel</button><button id="applyGoMeasure" class="button primary">Go</button></div>
+  </dialog>
+
+  <dialog id="analysisDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Score validation</span><h2>Music Inspector</h2></div><button class="close-btn" data-close-dialog="analysisDialog">×</button></div>
+    <div class="modal-body"><div id="analysisResults" class="analysis-results"></div></div>
+  </dialog>
+
+  <dialog id="commandDialog" class="modal command-dialog">
+    <div class="modal-header"><div><span class="eyebrow">Command navigation</span><h2>Search Commands</h2></div><button class="close-btn" data-close-dialog="commandDialog">×</button></div>
+    <div class="modal-body"><input id="commandSearchInput" class="command-search-input" placeholder="Type a command, for example harmonize or insert measure" autocomplete="off" /><div id="commandSearchResults" class="command-search-results"></div></div>
+  </dialog>
+
+  <dialog id="pasteLyricsDialog" class="modal wide">
+    <div class="modal-header"><div><span class="eyebrow">Professional lyrics entry</span><h2>Paste and Assign Lyrics</h2></div><button class="close-btn" data-close-dialog="pasteLyricsDialog">×</button></div>
+    <div class="modal-body"><div class="form-grid"><label>Verse<input id="pasteLyricsVerse" type="number" min="1" value="1" /></label><label>Line type<select id="pasteLyricsLineType"><option value="verse">Verse</option><option value="chorus">Chorus</option><option value="refrain">Refrain</option><option value="translation">Translation</option><option value="phonetic">Phonetic</option><option value="custom">Custom</option></select></label><label class="span-2">Lyrics text<textarea id="pasteLyricsText" rows="7" placeholder="Spaces move to the next note, hyphens split syllables, underscores create melismas."></textarea></label></div><div id="pasteLyricsPreview" class="lyrics-preview"></div></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="pasteLyricsDialog">Cancel</button><button id="previewLyricsButton" class="button">Preview</button><button id="commitLyricsButton" class="button primary">Apply assignments</button></div>
+  </dialog>
+
+  <dialog id="lyricToolsDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Lyrics management</span><h2 id="lyricToolsTitle">Lyrics Tool</h2></div><button class="close-btn" data-close-dialog="lyricToolsDialog">×</button></div>
+    <div class="modal-body form-grid"><div id="lyricCopyFields" class="contents"><label>Source verse<input id="copyVerseSource" type="number" min="1" value="1" /></label><label>Target verse<input id="copyVerseTarget" type="number" min="1" value="2" /></label></div><div id="lyricSearchFields" class="contents"><label>Find<input id="lyricSearchText" /></label><label>Replace<input id="lyricReplaceText" /></label><label>Verse (optional)<input id="lyricSearchVerse" type="number" min="1" /></label></div></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="lyricToolsDialog">Cancel</button><button id="applyLyricTool" class="button primary">Apply</button></div>
+  </dialog>
+
+  <dialog id="recoveryDialog" class="modal wide" aria-labelledby="recoveryTitle">
+    <div class="modal-header"><div><span class="eyebrow">Document safety</span><h2 id="recoveryTitle">Recovery Centre</h2></div><button class="close-btn" data-close-dialog="recoveryDialog" aria-label="Close Recovery Centre">×</button></div>
+    <div class="modal-body"><p>Recovered copies are never opened automatically. Review each item and choose how to continue.</p><div id="recoveryList" class="recovery-list"></div><div id="recoveryCompare" class="recovery-compare hidden" aria-live="polite"></div></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="recoveryDialog">Close</button></div>
+  </dialog>
+
+  <dialog id="aboutDialog" class="modal" aria-labelledby="aboutTitle">
+    <div class="modal-header"><div><span class="eyebrow">Official application</span><h2 id="aboutTitle">About Airmonlink Composer</h2></div><button class="close-btn" data-close-dialog="aboutDialog">×</button></div>
+    <div class="modal-body about-content"><img src="../../assets/official-logo.png" alt="Official Airmonlink Composer logo" /><p><strong>Airmonlink Composer 1.0.0 · Build 12</strong></p><p>Original intelligent music notation, lyrics, harmony and tonic sol-fa software.</p></div>
+  </dialog>
+
+  <dialog id="solfaTranscriptionDialog" class="modal wide-modal">
+    <div class="modal-header"><div><span class="eyebrow">Structured musical conversion</span><h2>Tonic Sol-fa transcription and validation</h2><p>Formal grammar • musical-time placement • linked staff preview</p></div><button class="close-btn" data-close-dialog="solfaTranscriptionDialog" aria-label="Close">×</button></div>
+    <div class="modal-body solfa-transcription-body">
+      <div class="solfa-input-grid">
+        <label>Destination part<select id="solfaInputPart"></select></label>
+        <label>Layer<select id="solfaInputVoice"><option value="1">Layer 1</option><option value="2">Layer 2</option><option value="3">Layer 3</option><option value="4">Layer 4</option></select></label>
+        <label>Staff<select id="solfaInputStaff"><option value="">Single/current staff</option><option value="treble">Treble</option><option value="bass">Bass</option></select></label>
+        <label>Convention<select id="solfaInputConvention"><option value="airmonlink-traditional-v1">Airmonlink Traditional v1</option><option value="airmonlink-legacy-v0">Legacy compatibility</option></select></label>
+      </div>
+      <label class="full-field">Tonic Sol-fa source<textarea id="solfaSourceInput" rows="7" spellcheck="false" placeholder="d r m f | s — : l t d' |"></textarea></label>
+      <div class="solfa-parser-actions"><button id="validateSolfaInput" class="button">Validate and preview</button><button id="applySolfaInput" class="button primary">Replace destination passage</button><label class="checkbox-label"><input id="solfaAllowIncomplete" type="checkbox" /> Allow incomplete final measure</label></div>
+      <div id="solfaParseSummary" class="solfa-parse-summary">Enter tonic sol-fa and choose Validate.</div>
+      <div id="solfaParsePreview" class="solfa-parse-preview" aria-live="polite"></div>
+      <details><summary>Documented symbol table</summary><div id="solfaSymbolTable" class="solfa-symbol-table"></div></details>
+    </div>
+  </dialog>
+
+  <dialog id="anchoredTextDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Semantic score text</span><h2 id="anchoredTextTitle">Add anchored text</h2></div><button class="close-btn" data-close-dialog="anchoredTextDialog">×</button></div>
+    <div class="modal-body form-grid"><label>Text<textarea id="anchoredTextValue" rows="4"></textarea></label><label>Type<select id="anchoredTextType"><option value="staff-text">Staff text</option><option value="measure-text">Measure text</option><option value="system-text">System text</option><option value="rehearsal">Rehearsal mark</option><option value="tempo-text">Tempo text</option><option value="technique-text">Technique text</option><option value="page-text">Page text</option><option value="header-text">Header text</option><option value="footer-text">Footer text</option></select></label><label>Placement<select id="anchoredTextPlacement"><option value="above">Above</option><option value="below">Below</option></select></label><label>Anchor<input id="anchoredTextAnchor" readonly /></label></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="anchoredTextDialog">Cancel</button><button id="applyAnchoredText" class="button primary">Add text</button></div>
+  </dialog>
+
+  <dialog id="pickupDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Measure structure</span><h2>Create / Configure Pickup Measure</h2></div><button class="close-btn" data-close-dialog="pickupDialog">×</button></div>
+    <div class="modal-body form-grid"><label>Pickup duration<select id="pickupDuration"><option value="0">No pickup</option><option value="0.25">Sixteenth</option><option value="0.5">Eighth</option><option value="0.75">Dotted eighth</option><option value="1">Quarter</option><option value="1.5">Dotted quarter</option><option value="2">Half</option><option value="custom">Custom…</option></select></label><label>Custom quarter-note beats<input id="pickupCustom" type="number" min="0" step="0.0625" value="1" /></label><p class="span-2">The displayed time signature remains unchanged. Later notes, lyrics, ties, layers and playback positions are moved as one undoable operation.</p></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="pickupDialog">Cancel</button><button id="applyPickup" class="button primary">Apply pickup</button></div>
+  </dialog>
+
+  <dialog id="importReportDialog" class="modal wide">
+    <div class="modal-header"><div><span class="eyebrow">MusicXML diagnostics</span><h2>Import Report</h2></div><button class="close-btn" data-close-dialog="importReportDialog">×</button></div>
+    <div class="modal-body"><div id="importReportContent" class="analysis-results"></div></div>
+    <div class="modal-footer"><button class="button" data-close-dialog="importReportDialog">Close</button></div>
+  </dialog>
+
+  <dialog id="helpDialog" class="modal">
+    <div class="modal-header"><div><span class="eyebrow">Getting started</span><h2>Airmonlink Composer Help</h2></div><button class="close-btn" data-close-dialog="helpDialog">×</button></div>
+    <div class="modal-body help-content"><h3>Enter music</h3><p>Select a part and duration, then move the pointer over the staff. A faint ghost note shows the exact pitch and beat; red means it cannot fit in that bar. Click to place it. Drag existing notes vertically or horizontally within the same clef.</p><h3>Keyboard shortcuts</h3><p><kbd>Space</kbd> play or stop · <kbd>Ctrl+S</kbd> save · <kbd>Ctrl+Z</kbd> undo · <kbd>Delete</kbd> remove selected note · <kbd>1–7</kbd> choose whole through sixty-fourth durations · <kbd>Shift+click</kbd> adds a chord note.</p><h3>Harmony and sol-fa</h3><p>Enter a melody on any selected staff and layer, choose Harmonize, then choose whether the harmony should use layers on that staff, the same piano grand staff, SATB staves, or newly added staves. Tonic sol-fa and lyrics update automatically.</p></div>
+  </dialog>
+
+
+  <datalist id="timeSignatureOptions">
+    <option value="2/1"></option><option value="3/1"></option><option value="2/2"></option><option value="3/2"></option><option value="4/2"></option>
+    <option value="2/4"></option><option value="3/4"></option><option value="4/4"></option><option value="5/4"></option><option value="6/4"></option><option value="7/4"></option>
+    <option value="3/8"></option><option value="5/8"></option><option value="6/8"></option><option value="7/8"></option><option value="9/8"></option><option value="11/8"></option><option value="12/8"></option><option value="15/8"></option>
+    <option value="5/16"></option><option value="7/16"></option><option value="9/16"></option><option value="11/16"></option>
+  </datalist>
+  <div id="screenReaderStatus" class="sr-only" aria-live="polite"></div>
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+  <input id="webFileInput" type="file" accept=".airscore,.musicxml,.xml,.mid,.midi,.mxl" hidden />
+
+  <script src="../core/music-theory.js"></script>
+  <script src="../core/score-model.js"></script>
+  <script src="../core/layout-engine.js"></script>
+  <script src="../core/lyrics.js"></script>
+  <script src="../core/solfa-parser.js"></script>
+  <script src="../core/solfa.js"></script>
+  <script src="../core/solfa-layout.js"></script>
+  <script src="../core/harmony.js"></script>
+  <script src="../core/airscore.js"></script>
+  <script src="../core/history.js"></script>
+  <script src="../core/selection.js"></script>
+  <script src="../core/editing.js"></script>
+  <script src="../core/notations.js"></script>
+  <script src="../core/midi-input.js"></script>
+  <script src="../core/formats.js"></script>
+  <script src="../core/playback.js"></script>
+  <script src="../core/workspace-state.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

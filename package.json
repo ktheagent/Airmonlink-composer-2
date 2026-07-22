@@ -1,0 +1,85 @@
+{
+  "name": "airmonlink-composer",
+  "version": "1.1.0",
+  "description": "Airmonlink Composer - intelligent music notation, harmony and tonic sol-fa desktop application",
+  "main": "src/main.js",
+  "author": "Airmonlink",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node --test test/*.test.js",
+    "lint": "node scripts/lint.js",
+    "validate": "npm run lint && npm test",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win nsis portable",
+    "dist:linux": "electron-builder --linux AppImage",
+    "preview": "node scripts/build-preview.js",
+    "browser-smoke": "python scripts/browser_smoke.py",
+    "validate:full": "npm run validate && npm run preview && npm run browser-smoke"
+  },
+  "devDependencies": {
+    "electron": "^37.2.3",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.airmonlink.composer",
+    "productName": "Airmonlink Composer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "perMachine": true,
+      "artifactName": "Airmonlink-Composer-${version}-Build14-Setup.${ext}",
+      "runAfterFinish": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png",
+      "category": "AudioVideo"
+    },
+    "fileAssociations": [
+      {
+        "ext": "airscore",
+        "name": "Airmonlink Composer Score",
+        "description": "Airmonlink Composer score document",
+        "icon": "assets/icon.ico",
+        "role": "Editor"
+      }
+    ],
+    "portable": {
+      "artifactName": "Airmonlink-Composer-${version}-Build14-Portable.${ext}"
+    },
+    "buildVersion": "1.1.0.14"
+  },
+  "buildNumber": "14"
+}

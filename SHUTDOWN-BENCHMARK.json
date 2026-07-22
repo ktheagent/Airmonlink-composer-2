@@ -1,0 +1,46 @@
+{
+  "elapsedMs": 210.7,
+  "status": "approved",
+  "stages": [
+    {
+      "stage": "renderer-shutdown-request",
+      "at": 1784602134343,
+      "reason": "window-close",
+      "decision": "discard"
+    },
+    {
+      "stage": "autosave-settle",
+      "at": 1784602134344,
+      "status": "completed",
+      "durationMs": 0.1
+    },
+    {
+      "stage": "playback-audio-stop",
+      "at": 1784602134344,
+      "status": "completed",
+      "durationMs": 0.1
+    },
+    {
+      "stage": "preview-notes-stop",
+      "at": 1784602134344,
+      "status": "completed"
+    },
+    {
+      "stage": "midi-close",
+      "at": 1784602134344,
+      "status": "completed",
+      "durationMs": 0.1
+    },
+    {
+      "stage": "workspace-save",
+      "at": 1784602134344,
+      "status": "completed",
+      "durationMs": 0.2
+    },
+    {
+      "stage": "owned-ui-close",
+      "at": 1784602134344,
+      "status": "completed"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+AIRMONLINK COMPOSER 1.0.0 PHASE 2 TEST REPORT
+================================================
+Date: 2026-07-21
+Version: 1.0.0
+Build: 12
+
+COMMANDS
+--------
+npm run validate:full
+python scripts/shutdown_benchmark.py
+
+RESULTS
+-------
+JavaScript syntax:       40 files passed
+Automated tests:         119 passed / 0 failed
+Browser interaction:     70 passed / 0 failed
+Runtime exceptions:      0
+Console errors:          0
+Preview build:           passed
+Shutdown benchmark:      passed
+
+CORE MODEL AND NOTATION
+-----------------------
+- Notes, rests, durations, dotted values and measure capacity: passed
+- Exactly four independent layers: passed
+- Calculated rests and layer capacity: passed
+- Ties, slurs and tied playback attack merging: passed
+- Lyrics, verses, hyphens, elisions and melismas: passed
+- Tonic Sol-fa parser, timed events and linked staff representation: passed
+- Save/reopen, undo/redo, MXL, MusicXML and MIDI foundations: passed
+
+PHASE 2 CHORDS AND VOICES
+-------------------------
+- Add second/several pitches at one tick: passed
+- Stable semantic chord ID and shared duration: passed
+- Remove one chord member without deleting the chord: passed
+- Move/transpose chord member and complete chord: passed
+- Chord playback simultaneous onset: passed
+- Seconds, inter-voice unisons and accidental columns: passed
+- Two layers at one tick with different durations: passed
+- Voice rests and independent deletion/editing: passed
+- MusicXML voice/chord preservation: passed
+
+PHASE 2 LAYOUT
+--------------
+- Rhythmic segment profiling and minimum measure widths: passed
+- Duration-aware note placement: passed
+- System reflow and forced system/page breaks: passed
+- Single staff, grand staff and choir layout fixtures: passed
+- Multiple lyric verses and Tonic Sol-fa vertical expansion: passed
+- Manual staff spacing and reset to automatic: passed
+- Metadata/header reservation and page reflow: passed
+- Optimize system/selection/score command paths: passed
+
+PANELS AND WORKSPACE
+--------------------
+- Composition Notepad visible/persistent: passed
+- Inspector hidden by default: passed
+- Piano Input hidden by default: passed
+- Tonic Sol-fa View-menu panel state: passed
+- View-menu checks match visibility: passed
+- Collapse/expand and right-side tab state: passed
+- Bottom-dock sizing and no-overlay behavior: passed
+- Compact-window redocking and safe dimensions: passed
+- Reset workspace and preference restoration: passed
+
+METADATA, TEXT, AND PICKUP
+--------------------------
+- Composer/date/source semantic metadata: passed
+- Right-aligned composer/date presentation: passed
+- Staff/system/measure/segment/page/header/footer text anchors: passed
+- Text save/reopen and reflow stability: passed
+- Common/custom pickup durations: passed
+- Pickup validation, later-event shifts and playback: passed
+- MusicXML implicit pickup import/export: passed
+- Undo/redo: passed
+
+MUSICXML
+--------
+- Uncompressed MusicXML and compressed MXL: passed
+- Per-measure cursor, divisions, chord, backup and forward: passed
+- Parts, staves, voices, chords, rests and pickup: passed
+- Composer/date/credits/rights/source metadata: passed
+- One and multiple lyric verses: passed
+- Syllabic states, hyphens, elisions and extenders: passed
+- Direction words, tempo, dynamics, rehearsal and harmony: passed
+- Page settings, manual system/page breaks: passed
+- Import report counts, warnings and fatal-error channels: passed
+- Native save/reopen and controlled round-trip foundations: passed
+
+PERFORMANCE REGRESSION
+----------------------
+- Cached measure/event lookup invalidates correctly: passed
+- Large-score binary measure lookup: passed
+- Hidden Tonic Sol-fa/Mixer views remain lazy: passed
+- Selection/layer/playback visual refresh avoids full engraving: passed
+- Idle autosave and delegated interaction wiring: passed
+
+SHUTDOWN LIFECYCLE
+------------------
+- Duplicate close requests coalesce: passed
+- Dirty-score Save/Discard/Cancel protocol: passed
+- Cancel leaves application active: passed
+- Save failure/cleanup timeout aborts close safely: passed
+- New edits blocked while shutdown is in progress: passed
+- Playback/audio and preview-note stop: passed
+- MIDI all-notes-off and port close path: passed
+- Autosave/timer cancellation: passed
+- Workspace persistence before panel/dialog destruction: passed
+- Owned dialog/menu/floating-state cleanup: passed
+- Document lock release with bounded wait: passed
+- File -> Exit and title-bar close share coordinator: passed
+- Controlled renderer cleanup time: 210.7 ms
+
+WINDOWS ARTIFACT VERIFICATION
+-----------------------------
+- Setup and uninstaller compile: passed
+- Setup format: PE32+ Windows x64 GUI
+- Embedded application payload: 78 files
+- Payload ZIP integrity: passed
+- Embedded app.asar metadata: version 1.0.0, build 12, app ID verified
+- Setup checksum: 5460a132fd9ff296a02a799b5c5e1005d1df67e068ee9f55c36bd99d5d59d6fe
+
+NOT PERFORMED
+-------------
+- Running the installer on Windows
+- Real title-bar/File Exit Save/Discard/Cancel execution on Windows
+- Confirmation in Windows Task Manager that no process remains
+- Real MIDI/audio/microphone device shutdown
+- Floating panel shutdown on multiple monitors
+- Long-session Windows memory/performance testing
+- Code-signing/SmartScreen validation; the build is unsigned
