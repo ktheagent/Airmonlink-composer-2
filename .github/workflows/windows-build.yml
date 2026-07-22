@@ -1,0 +1,124 @@
+name: Validate and Build Windows Release
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-source:
+    name: Validate source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint source
+        run: npm run lint
+
+      - name: Run automated tests
+        run: npm test
+
+  build-and-test-windows:
+    name: Build and validate Windows x64
+    needs: validate-source
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Create validation directories
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force validation | Out-Null
+
+      - name: Install locked dependencies
+        shell: pwsh
+        run: |
+          npm ci 2>&1 | Tee-Object -FilePath validation/npm-ci.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Lint source
+        shell: pwsh
+        run: |
+          npm run lint 2>&1 | Tee-Object -FilePath validation/lint.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run and count automated tests
+        shell: pwsh
+        run: |
+          npm test 2>&1 | Tee-Object -FilePath validation/tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $text = Get-Content validation/tests.log -Raw
+          $tests = [regex]::Match($text, '(?m)^# tests\s+(\d+)\s*$')
+          $passed = [regex]::Match($text, '(?m)^# pass\s+(\d+)\s*$')
+          $failed = [regex]::Match($text, '(?m)^# fail\s+(\d+)\s*$')
+          if (-not $tests.Success -or -not $passed.Success -or -not $failed.Success) {
+            throw "Could not prove the Node test totals from TAP output."
+          }
+          if ([int]$tests.Groups[1].Value -lt 141 -or
+              [int]$passed.Groups[1].Value -ne [int]$tests.Groups[1].Value -or
+              [int]$failed.Groups[1].Value -ne 0) {
+            throw "Expected at least 141 passing tests and zero failures."
+          }
+
+      - name: Build Windows x64 NSIS and portable executables
+        shell: pwsh
+        run: |
+          npm run dist:win 2>&1 | Tee-Object -FilePath validation/windows-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate PE metadata, install, launch, association, and uninstall
+        shell: pwsh
+        run: ./scripts/windows-release-validation.ps1
+
+      - name: Detect generated distributables
+        if: always()
+        id: distributables
+        shell: pwsh
+        run: |
+          $installer = Test-Path "release/Airmonlink-Composer-1.1.0-Build14-Setup.exe" -PathType Leaf
+          $portable = Test-Path "release/Airmonlink-Composer-1.1.0-Build14-Portable.exe" -PathType Leaf
+          $checksums = Test-Path "release/SHA256SUMS.txt" -PathType Leaf
+          "present=$($installer -and $portable -and $checksums)".ToLowerInvariant() | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload Windows distributables
+        if: ${{ always() && steps.distributables.outputs.present == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Airmonlink-Composer-1.1.0-Build14-Windows
+          path: |
+            release/Airmonlink-Composer-1.1.0-Build14-Setup.exe
+            release/Airmonlink-Composer-1.1.0-Build14-Portable.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Windows validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Airmonlink-Composer-1.1.0-Build14-Windows-Validation
+          path: validation/**
+          if-no-files-found: warn
+          retention-days: 30
