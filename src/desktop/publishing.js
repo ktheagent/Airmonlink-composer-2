@@ -183,7 +183,7 @@ function createAtomicBatch(targetPaths) {
 
 function publishingUrl(value) {
   const source = String(value ?? '');
-  const match = /^airmon-publish:\/\/(pdf|png)(?:\?([^#])*))?$/i.exec(source);
+  const match = /^airmon-publish:\/\/(pdf|png)(?:\?([^#])*)?$/i.exec(source);
   if (!match) return null;
   const kind = match[1].toLowerCase();
   const searchParams = new URLSearchParams(match[2] || '');
