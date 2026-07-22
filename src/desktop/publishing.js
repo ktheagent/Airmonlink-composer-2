@@ -182,18 +182,18 @@ function createAtomicBatch(targetPaths) {
 }
 
 function publishingUrl(value) {
-  let parsed;
-  try { parsed = new URL(string(value)); } catch { return null; }
-  if (parsed.protocol !== 'airmon-publish:') return null;
-  const kind = parsed.hostname;
-  if (kind !== 'pdf' && kind !== 'png') return null;
+  const source = String(value ?? '');
+  const match = /^airmon-publish:\/\/(pdf|png)(?:\?([^#])*))?$/i.exec(source);
+  if (!match) return null;
+  const kind = match[1].toLowerCase();
+  const searchParams = new URLSearchParams(match[2] || '');
   return {
     kind,
     request: normalizePublishRequest({
-      view: parsed.searchParams.get('view'),
-      title: parsed.searchParams.get('title'),
-      width: parsed.searchParams.get('width'),
-      height: parsed.searchParams.get('height')
+      view: searchParams.get('view'),
+      title: searchParams.get('title'),
+      width: searchParams.get('width'),
+      height: searchParams.get('height')
     })
   };
 }
