@@ -33,12 +33,21 @@ test('numbered PNG paths are unique and stable', () => {
   assert.match(publishing.numberedPngPath(selected, 12, 12), /Anthem-page-012\.png$/);
 });
 
-test('private publishing URL rejects unsupported schemes and kinds', () => {
+test('private publishing URL accepts only strict PDF and PNG commands', () => {
   assert.equal(publishing.publishingUrl('https://example.com'), null);
   assert.equal(publishing.publishingUrl('airmon-publish://exe?title=x'), null);
-  const parsed = publishing.publishingUrl('airmon-publish://pdf?view=solfa&title=Hymn&width=794&height=1123');
-  assert.equal(parsed.kind, 'pdf');
-  assert.equal(parsed.request.view, 'solfa');
+  assert.equal(publishing.publishingUrl('airmon-publish://pdf/path?title=x'), null);
+  assert.equal(publishing.publishingUrl('airmon-publish://pdf?title=x#fragment'), null);
+
+  const pdf = publishing.publishingUrl('airmon-publish://pdf?view=solfa&title=Hymn&width=794&height=1123');
+  assert.equal(pdf.kind, 'pdf');
+  assert.equal(pdf.request.view, 'solfa');
+  assert.equal(pdf.request.width, 794);
+  assert.equal(pdf.request.height, 1123);
+
+  const png = publishing.publishingUrl('AIRMON-PUBLISH://PNG?view=score&title=Anthem');
+  assert.equal(png.kind, 'png');
+  assert.equal(png.request.view, 'score');
 });
 
 test('PDF and PNG signatures are validated before success', () => {
