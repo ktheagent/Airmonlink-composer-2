@@ -78,7 +78,7 @@ jobs:
           $summary = Select-String -Path validation\tests.tap -Pattern "^# tests (\d+)$" | Select-Object -Last 1
           if (-not $summary) { throw "TAP test count was not found." }
           $count = [int]$summary.Matches[0].Groups[1].Value
-          if ($count -lt 150) { throw "Expected at least 150 tests; found $count." }
+          if ($count -lt 152) { throw "Expected at least 152 tests; found $count." }
           if (Select-String -Path validation\tests.tap -Pattern "^# fail [1-9]") { throw "TAP reported failures." }
 
       - name: Build Windows installer and portable app
@@ -95,16 +95,16 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          & .\scripts\windows-release-validation.ps1 -ReleaseDirectory release -ValidationDirectory validation -ExpectedBuild 15
+          & .\scripts\windows-release-validation.ps1 -ReleaseDir release -ValidationDir validation -ExpectedBuild 16
           if ($LASTEXITCODE -ne 0) { throw "Windows release validation failed with exit code $LASTEXITCODE." }
 
       - name: Upload Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: Airmonlink-Composer-1.1.0-Build15-Windows
+          name: Airmonlink-Composer-1.1.0-Build16-Windows
           path: |
-            release/Airmonlink-Composer-1.1.0-Build15-Setup.exe
-            release/Airmonlink-Composer-1.1.0-Build15-Portable.exe
+            release/Airmonlink-Composer-1.1.0-Build16-Setup.exe
+            release/Airmonlink-Composer-1.1.0-Build16-Portable.exe
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -113,7 +113,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Airmonlink-Composer-1.1.0-Build15-Windows-Validation
+          name: Airmonlink-Composer-1.1.0-Build16-Windows-Validation
           path: validation/**
           if-no-files-found: warn
           retention-days: 30
