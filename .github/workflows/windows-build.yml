@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      NPM_CONFIG_PRODUCTION: "false"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,43 +27,58 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.4.1"
-          cache: npm
-          cache-dependency-path: package-lock.json
+          node-version: "22.22.2"
 
-      - name: Verify project manifests
+      - name: Pin npm and clear production-only configuration
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          foreach ($path in @("package.json", "package-lock.json")) {
-            if (-not (Test-Path $path -PathType Leaf)) {
-              throw "Required manifest is missing: $path"
-            }
+          New-Item -ItemType Directory -Force validation | Out-Null
+
+          Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
+          Remove-Item Env:NPM_CONFIG_PRODUCTION -ErrorAction SilentlyContinue
+          Remove-Item Env:NPM_CONFIG_OMIT -ErrorAction SilentlyContinue
+
+          npm install --global npm@10.8.0 --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
           }
-          "node=$(node --version)"
-          "npm=$(npm --version)"
-          "production=$(npm config get production)"
-          "omit=$(npm config get omit)"
+
+          npm config delete production --location=user
+          npm config delete omit --location=user
+
+          $nodeVersion = (node --version).Trim()
+          $npmVersion = (npm --version).Trim()
+
+          if ($nodeVersion -ne "v22.22.2") {
+            throw "Expected Node v22.22.2 but found $nodeVersion."
+          }
+          if ($npmVersion -ne "10.8.0") {
+            throw "Expected npm 10.8.0 but found $npmVersion."
+          }
+
+          "node=$nodeVersion" | Tee-Object -FilePath validation/toolchain.log
+          "npm=$npmVersion" | Tee-Object -FilePath validation/toolchain.log -Append
+          "production=$(npm config get production)" | Tee-Object -FilePath validation/toolchain.log -Append
+          "omit=$(npm config get omit)" | Tee-Object -FilePath validation/toolchain.log -Append
 
       - name: Install locked dependencies including build tools
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          New-Item -ItemType Directory -Force validation | Out-Null
-          npm ci --include=dev --no-audit --no-fund 2>&1 |
-            Tee-Object -FilePath validation/npm-ci.log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
 
-          npm ls electron-builder --depth=0 2>&1 |
-            Tee-Object -FilePath validation/electron-builder-version.log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          cmd.exe /d /s /c "npm ci --include=dev --no-audit --no-fund > validation\npm-ci.log 2>&1"
+          $installExitCode = $LASTEXITCODE
+          Get-Content validation/npm-ci.log
+
+          if ($installExitCode -ne 0) {
+            throw "npm ci failed with exit code $installExitCode."
           }
 
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
           $shim = Join-Path $PWD "node_modules\.bin\electron-builder.cmd"
+
           foreach ($path in @($builder, $shim)) {
             if (-not (Test-Path $path -PathType Leaf)) {
               throw "Required build tool is missing after npm ci: $path"
@@ -78,25 +93,32 @@ jobs:
       - name: Lint source
         shell: pwsh
         run: |
-          npm run lint 2>&1 | Tee-Object -FilePath validation/lint.log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $ErrorActionPreference = "Continue"
+          cmd.exe /d /s /c "npm run lint > validation\lint.log 2>&1"
+          $commandExitCode = $LASTEXITCODE
+          Get-Content validation/lint.log
+          if ($commandExitCode -ne 0) {
+            throw "Lint failed with exit code $commandExitCode."
           }
 
       - name: Run automated tests
         shell: pwsh
         run: |
-          npm test 2>&1 | Tee-Object -FilePath validation/tests.log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $ErrorActionPreference = "Continue"
+          cmd.exe /d /s /c "npm test > validation\tests.log 2>&1"
+          $commandExitCode = $LASTEXITCODE
+          Get-Content validation/tests.log
+          if ($commandExitCode -ne 0) {
+            throw "Tests failed with exit code $commandExitCode."
           }
 
           $text = Get-Content validation/tests.log -Raw
           $tests = [regex]::Match($text, '(?m)^# tests\s+(\d+)\s*$')
           $passed = [regex]::Match($text, '(?m)^# pass\s+(\d+)\s*$')
           $failed = [regex]::Match($text, '(?m)^# fail\s+(\d+)\s*$')
+
           if (-not $tests.Success -or -not $passed.Success -or -not $failed.Success) {
-            throw "Could not prove Node test totals from TAP output."
+            throw "Could not prove the Node test totals from TAP output."
           }
           if ([int]$tests.Groups[1].Value -lt 141 -or
               [int]$passed.Groups[1].Value -ne [int]$tests.Groups[1].Value -or
@@ -108,19 +130,32 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
+
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
           if (-not (Test-Path $builder -PathType Leaf)) {
-            throw "electron-builder disappeared before packaging: $builder"
+            throw "electron-builder is missing before packaging: $builder"
           }
-          npm run dist:win 2>&1 |
-            Tee-Object -FilePath validation/windows-build.log
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+
+          cmd.exe /d /s /c "npm run dist:win > validation\windows-build.log 2>&1"
+          $commandExitCode = $LASTEXITCODE
+          Get-Content validation/windows-build.log
+          if ($commandExitCode -ne 0) {
+            throw "Windows packaging failed with exit code $commandExitCode."
           }
 
       - name: Validate PE metadata, install, launch, association, and uninstall
         shell: pwsh
-        run: ./scripts/windows-release-validation.ps1
+        run: |
+          $ErrorActionPreference = "Stop"
+          try {
+            & ./scripts/windows-release-validation.ps1 *>&1 |
+              Tee-Object -FilePath validation/windows-validation.log
+          } catch {
+            if (Test-Path validation/windows-validation.log) {
+              Get-Content validation/windows-validation.log
+            }
+            throw
+          }
 
       - name: Detect generated distributables
         if: always()
