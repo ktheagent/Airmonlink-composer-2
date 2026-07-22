@@ -145,9 +145,69 @@
     return true;
   }
 
+  function repairLegacyVerseSuffixes(score, options = {}) {
+    const minimumMatches = Math.max(2, Number(options.minimumMatches) || 3);
+    const minimumRatio = Math.max(0.5, Math.min(1, Number(options.minimumRatio) || 0.8));
+    const requestedVerse = options.verse == null ? null : Math.max(1, Number(options.verse) || 1);
+    const requestedLineType = options.lineType || null;
+    const partIds = options.partIds ? new Set(options.partIds.map(String)) : null;
+    const groups = new Map();
+
+    (score.parts || []).forEach(part => {
+      if (partIds && !partIds.has(String(part.id))) return;
+      (part.events || []).filter(event => event.type === 'note').forEach(event => {
+        (event.lyrics || []).forEach(lyric => {
+          const verse = Math.max(1, Number(lyric.verse) || 1);
+          const lineType = lyric.lineType || 'verse';
+          if (requestedVerse != null && verse !== requestedVerse) return;
+          if (requestedLineType && lineType !== requestedLineType) return;
+          const key = `${part.id}\u0000${event.staff || ''}\u0000${event.voice || 1}\u0000${verse}\u0000${lineType}`;
+          if (!groups.has(key)) groups.set(key, { part, verse, lineType, entries: [] });
+          groups.get(key).entries.push({ event, lyric });
+        });
+      });
+    });
+
+    const repairs = [];
+    const repairedGroups = [];
+    for (const group of groups.values()) {
+      const suffix = String(group.verse);
+      const textual = group.entries.filter(({ lyric }) => String(lyric.text || '').trim());
+      const candidates = textual.filter(({ lyric }) => {
+        const value = String(lyric.text || '').trimEnd();
+        if (!value.endsWith(suffix) || value.length <= suffix.length) return false;
+        const base = value.slice(0, -suffix.length);
+        if (!base.trim() || /\d\test(base)) return false;
+        return true;
+      });
+
+      if (candidates.length < minimumMatches || candidates.length / Math.max(1, textual.length) < minimumRatio) continue;
+      repairedGroups.push({ partId: group.part.id, verse: group.verse, lineType: group.lineType, matches: candidates.length, total: textual.length });
+
+      candidates.forEach(({ event, lyric }) => {
+        const before = String(lyric.text || '');
+        const trailingWhitespace = before.match(/\s*$/)?.[0] || '';
+        const core = before.slice(0, before.length - trailingWhitespace.length);
+        const after = core.slice(0, -suffix.length) + trailingWhitespace;
+        repairs.push({ partId: group.part.id, eventId: event.id, lyricId: lyric.id || null, verse: group.verse, before, after });
+        if (!options.dryRun) lyric.text = after;
+      });
+    }
+
+    if (!options.dryRun && repairs.length) {
+      const touchedEvents = new Set(repairs.map(item => item.eventId));
+      (score.parts || []).forEach(part => (part.events || []).forEach(event => {
+        if (touchedEvents.has(event.id) && typeof model.normalizeEventLyrics === 'function') model.normalizeEventLyrics(event, part);
+      }));
+      if (typeof model.touch === 'function') model.touch(score);
+    }
+
+    return { changed: options.dryRun ? 0 : repairs.length, candidates: repairs.length, groups: repairedGroups, repairs };
+  }
+
   function lyricCount(score) {
     return score.parts.reduce((sum, part) => sum + part.events.reduce((eventSum, event) => eventSum + (Array.isArray(event.lyrics) ? event.lyrics.length : 0), 0), 0);
   }
 
-  return { eligibleNotes, tokenizeLyrics, previewAssignments, applyAssignments, nextEligibleNote, previousEligibleNote, copyVerse, searchReplace, resetPosition, lyricCount };
+  return { eligibleNotes, tokenizeLyrics, previewAssignments, applyAssignments, nextEligibleNote, previousEligibleNote, copyVerse, searchReplace, resetPosition, repairLegacyVerseSuffixes, lyricCount };
 });
