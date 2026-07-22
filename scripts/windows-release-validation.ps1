@@ -45,7 +45,8 @@ $requiredSource = @(
   "src\ui\publishing-ui.js",
   "src\ui\publishing-exposure.js",
   "test\v122-dedicated-publishing.test.js",
-  "test\v123-build16-publishing-exposure.test.js"
+  "test\v123-build16-publishing-exposure.test.js",
+  "test\v124-build16-release-validator.test.js"
 )
 
 foreach ($relative in $requiredSource) {
@@ -56,7 +57,7 @@ $releaseBootstrapPath = Join-Path $root "src\release-bootstrap.js"
 $releaseBootstrapSource = if (Test-Path $releaseBootstrapPath) { Get-Content $releaseBootstrapPath -Raw } else { "" }
 Assert-Check ($releaseBootstrapSource -match "const BUILD = $ExpectedBuild;") "Exposure build identity" "release-bootstrap.js declares Build $ExpectedBuild"
 Assert-Check ($releaseBootstrapSource -match "publishing-exposure\.js") "Exposure source wiring" "release-bootstrap.js loads publishing-exposure.js"
-Assert-Check ($releaseBootstrapSource -match "require\('\\.\\/bootstrap'\)") "Desktop bootstrap chaining" "release-bootstrap.js chains to src/bootstrap.js"
+Assert-Check ($releaseBootstrapSource.Contains("require('./bootstrap');")) "Desktop bootstrap chaining" "release-bootstrap.js contains require('./bootstrap');"
 
 Assert-Check (Test-Path $setupPath) "Setup artifact exists" $setupPath
 Assert-Check (Test-Path $portablePath) "Portable artifact exists" $portablePath
@@ -99,7 +100,7 @@ $hashLines = @()
 foreach ($file in @($setupPath, $portablePath)) {
   if (Test-Path $file) {
     $hash = Get-FileHash $file -Algorithm SHA256
-    $hashLines += "$($hash.Hash.ToLowerInvariant()) $([IO.Path]::GetFileName($file))"
+    $hashLines += "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($file))"
   }
 }
 
