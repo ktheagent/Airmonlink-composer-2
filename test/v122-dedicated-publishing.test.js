@@ -8,7 +8,7 @@ const publishing = require('../src/desktop/publishing');
 test('publishing request sanitizes filenames and preserves physical dimensions', () => {
   const request = publishing.normalizePublishRequest({
     view: 'solfa',
-    title: '  Psalm 23: <Choir>?  ',
+    title: ' Psalm 23: <Choir>? ',
     width: 794,
     height: 1123
   });
@@ -39,7 +39,9 @@ test('private publishing URL accepts only strict PDF and PNG commands', () => {
   assert.equal(publishing.publishingUrl('airmon-publish://pdf/path?title=x'), null);
   assert.equal(publishing.publishingUrl('airmon-publish://pdf?title=x#fragment'), null);
 
-  const pdf = publishing.publishingUrl('airmon-publish://pdf?view=solfa&title=Hymn&width=794&height=1123');
+  const pdf = publishing.publishingUrl(
+    'airmon-publish://pdf?view=solfa&title=Hymn&width=794&height=1123'
+  );
   assert.equal(pdf.kind, 'pdf');
   assert.equal(pdf.request.view, 'solfa');
   assert.equal(pdf.request.width, 794);
@@ -53,7 +55,9 @@ test('private publishing URL accepts only strict PDF and PNG commands', () => {
 test('PDF and PNG signatures are validated before success', () => {
   assert.doesNotThrow(() => publishing.assertPdfBuffer(Buffer.from('%PDF-1.7')));
   assert.throws(() => publishing.assertPdfBuffer(Buffer.from('bad')), /invalid|no document/i);
-  assert.doesNotThrow(() => publishing.assertPngBuffer(Buffer.from([137,80,78,71,13,10,26,10,0])));
+  assert.doesNotThrow(() =>
+    publishing.assertPngBuffer(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]))
+  );
   assert.throws(() => publishing.assertPngBuffer(Buffer.from('bad')), /invalid|no image/i);
 });
 
@@ -82,22 +86,26 @@ test('atomic PNG batch restores old files when installation fails', async () => 
   fs.promises.rename = async (from, to) => {
     if (String(from).endsWith('.tmp')) {
       installs += 1;
-      if (installs === 2) throw Object.assign(new Error('simulated install failure'), { code: 'EIO' });
+      if (installs === 2) {
+        throw Object.assign(new Error('simulated install failure'), { code: 'EIO' });
+      }
     }
     return originalRename(from, to);
   };
+
   try {
     await assert.rejects(batch.commit(), /simulated install failure/);
   } finally {
     fs.promises.rename = originalRename;
   }
+
   assert.equal(fs.readFileSync(one, 'utf8'), 'old-one');
   assert.equal(fs.readFileSync(two, 'utf8'), 'old-two');
   assert.deepEqual(fs.readdirSync(directory).sort(), ['page-001.png', 'page-002.png']);
   fs.rmSync(directory, { recursive: true, force: true });
 });
 
-test('bootstrap and renderer expose dedicated PDF and numbered PNG publishing', () => {
+test('desktop backend and renderer expose dedicated PDF and numbered PNG publishing', () => {
   const bootstrap = fs.readFileSync(path.join(__dirname, '..', 'src', 'bootstrap.js'), 'utf8');
   const ui = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'publishing-ui.js'), 'utf8');
   assert.match(bootstrap, /printToPDF/);
@@ -108,11 +116,11 @@ test('bootstrap and renderer expose dedicated PDF and numbered PNG publishing', 
   assert.match(ui, /score-page-sheet/);
 });
 
-test('Build 15 package metadata names both Windows artifacts consistently', () => {
+test('Build 16 package metadata names both Windows artifacts consistently', () => {
   const pkg = require('../package.json');
-  assert.equal(pkg.main, 'src/bootstrap.js');
-  assert.equal(pkg.buildNumber, '15');
-  assert.equal(pkg.build.buildVersion, '1.1.0.15');
-  assert.match(pkg.build.nsis.artifactName, /Build15/);
-  assert.match(pkg.build.portable.artifactName, /Build15/);
+  assert.equal(pkg.main, 'src/release-bootstrap.js');
+  assert.equal(pkg.buildNumber, '16');
+  assert.equal(pkg.build.buildVersion, '1.1.0.16');
+  assert.match(pkg.build.nsis.artifactName, /Build16/);
+  assert.match(pkg.build.portable.artifactName, /Build16/);
 });
