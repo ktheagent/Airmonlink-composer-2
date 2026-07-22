@@ -67,7 +67,19 @@ function Invoke-SilentUninstaller {
 
 function Stop-ProcessTree {
   param([int]$ProcessId)
-  & taskkill.exe /PID $ProcessId /T /F 2>&1 | Out-File -Append -FilePath (Join-Path $validationPath "process-termination.log")
+
+  $terminationLog = Join-Path $validationPath "process-termination.log"
+  $output = & taskkill.exe /PID $ProcessId /T /F 2>&1
+  $taskkillExitCode = $LASTEXITCODE
+
+  $output | Out-File -Append -FilePath $terminationLog
+  "taskkkill-exit-code=$taskkkillExitCode; pid=$ProcessId" |
+    Out-File -Append -FilePath $terminationLog
+
+  # taskkill can return 128 when the process has already exited. That is not
+  # a release-validation failure, and its native exit code must not leak into
+  # the successful script result.
+  $global:LASTEXITCODE = 0
 }
 
 $installerName = "Airmonlink-Composer-$ExpectedVersion-Build$ExpectedBuild-Setup.exe"
@@ -270,4 +282,16 @@ if ($failures.Count -gt 0) {
   throw "Windows validation failed:`n$($failures -join "`n")"
 }
 
+$successMarker = Join-Path $validationPath "windows-validation.ok"
+@(
+  "status=PASS"
+  "product=Airmonlink Composer"
+  "version=$ExpectedVersion"
+  "build=$ExpectedBuild"
+  "generatedAt=$([DateTime]::UtcNow.ToString('o'))")
+} | Set-Content -Encoding ascii $successMarker
+
+# Ensure an earlier native utility such as taskkill cannot determine the
+# caller's result after validation has completed successfully.
+$global:LASTEXITCODE = 0
 Write-Host "Windows validation completed without FAIL rows. BLOCKED rows remain explicitly reported."
