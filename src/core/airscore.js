@@ -1,9 +1,10 @@
 (function (root, factory) {
   const model = root.AirmonScoreModel || (typeof require === 'function' ? require('./score-model') : null);
-  const api = factory(model);
+  const lyrics = root.AirmonLyrics || (typeof require === 'function' ? require('./lyrics') : null);
+  const api = factory(model, lyrics);
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.AirmonAirscore = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (model) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (model, lyrics) {
   'use strict';
   const CURRENT_VERSION = 9;
 
@@ -85,8 +86,8 @@
       migrated.score.solfaMigrationReport = Array.isArray(migrated.score.solfaMigrationReport) ? migrated.score.solfaMigrationReport : [];
       migrated.score.solfaMigrationReport.push({ version: 9, status: 'migrated', convention: migrated.score.settings.solfaConvention, message: 'Formal tonic-solfa grammar settings were added without changing structured musical events.' });
     }
-    if (migrated.version < 9 && model?.repairLegacyLyricVerseSuffixes) {
-      model.repairLegacyLyricVerseSuffixes(migrated.score);
+    if (migrated.version < 9 && lyrics?.repairLegacyVerseSuffixes) {
+      lyrics.repairLegacyVerseSuffixes(migrated.score);
     }
     migrated.version = CURRENT_VERSION;
     migrated.schema = 'airscore-v10';
