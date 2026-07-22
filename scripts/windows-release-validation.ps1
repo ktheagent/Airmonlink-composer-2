@@ -1,7 +1,7 @@
 param(
   [string]$ReleaseDirectory = "release",
   [string]$ValidationDirectory = "validation",
-  [int]$ExpectedBuild = 15
+  [int]$ExpectedBuild = 16
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,19 +32,28 @@ function Assert-Check([bool]$Condition, [string]$Name, [string]$Details) {
 
 Assert-Check ($buildNumber -eq [string]$ExpectedBuild) "Package build number" "Expected $ExpectedBuild; found $buildNumber"
 Assert-Check ($buildVersion -eq "$version.$ExpectedBuild") "Windows build version" "Expected $version.$ExpectedBuild; found $buildVersion"
-Assert-Check ([string]$package.main -eq "src/bootstrap.js") "Publishing bootstrap" "Package entry point is $($package.main)"
+Assert-Check ([string]$package.main -eq "src/release-bootstrap.js") "Publishing bootstrap" "Package entry point is $($package.main)"
 Assert-Check ([string]$package.build.nsis.artifactName -match "Build$ExpectedBuild") "Installer naming" ([string]$package.build.nsis.artifactName)
 Assert-Check ([string]$package.build.portable.artifactName -match "Build$ExpectedBuild") "Portable naming" ([string]$package.build.portable.artifactName)
 
 $requiredSource = @(
+  "src\release-bootstrap.js",
   "src\bootstrap.js",
   "src\desktop\publishing.js",
   "src\ui\publishing-ui.js",
-  "test\v122-dedicated-publishing.test.js"
+  "src\ui\publishing-exposure.js",
+  "test\v122-dedicated-publishing.test.js",
+  "test\v123-build16-publishing-exposure.test.js"
 )
 foreach ($relative in $requiredSource) {
   Assert-Check (Test-Path (Join-Path $root $relative)) "Required source: $relative" $relative
 }
+
+$releaseBootstrapPath = Join-Path $root "src\release-bootstrap.js"
+$releaseBootstrapSource = if (Test-Path $releaseBootstrapPath) { Get-Content $releaseBootstrapPath -Raw } else { "" }
+Assert-Check ($releaseBootstrapSource -match "const BUILD = $ExpectedBuild;") "Exposure build identity" "release-bootstrap.js declares Build $ExpectedBuild"
+Assert-Check ($releaseBootstrapSource -match "publishing-exposure\.js") "Exposure source wiring" "release-bootstrap.js loads publishing-exposure.js"
+Assert-Check ($releaseBootstrapSource -match "require\('\\.\\/bootstrap'\)") "Desktop bootstrap chaining" "Release-bootstrap.js chains to src/bootstrap.js"
 
 Assert-Check (Test-Path $setupPath) "Setup artifact exists" $setupPath
 Assert-Check (Test-Path $portablePath) "Portable artifact exists" $portablePath
@@ -55,7 +64,7 @@ function Test-PeFile([string]$Path) {
   try {
     if ($stream.Length -lt 1024) { return $false }
     $reader = [System.IO.BinaryReader]::new($stream)
-    if ($reader.ReadUInt16() -ne 0x5A4D) { return $false }
+    if ($reader.ReadUInt16() -ne 0x5A4Di) { return $false }
     $stream.Position = 0x3C
     $peOffset = $reader.ReadInt32()
     if ($peOffset -lt 64 -or $peOffset -gt ($stream.Length - 4)) { return $false }
@@ -66,8 +75,8 @@ function Test-PeFile([string]$Path) {
   }
 }
 
-Assert-Check (Test-PeFile $setupPath) "Setup PE validation" "MZ and PE signatures"
-Assert-Check (Test-PeFile $portablePath) "Portable PE validation" "MZ and PE signatures"
+Assert-Check (Test-PeFile $setupPath) "Setup PE validation" "MZ and PE magic signatures"
+Assert-Check (Test-PeFile $portablePath) "Portable PE validation" "MZ; and PE magic signatures"
 
 if (Test-Path $setupPath) {
   $setupInfo = Get-Item $setupPath
