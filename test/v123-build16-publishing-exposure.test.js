@@ -12,7 +12,8 @@ test('Build 16 entry point installs publishing exposure after renderer navigatio
   assert.match(bootstrap, /dom-ready/);
   assert.match(bootstrap, /did-finish-load/);
   assert.match(bootstrap, /did-navigate-in-page/);
-  assert.match(bootstrap, /AirmonPublishingExposure\?\.build === 16/);
+  assert.match(bootstrap, /const BUILD = 16;/);
+  assert.match(bootstrap, /AirmonPublishingExposure\?\.build === \$\{BUILD\}/);
   assert.match(bootstrap, /require\('\.\/bootstrap'\)/);
 
   assert.match(exposure, /Build 16 publishing active/);
