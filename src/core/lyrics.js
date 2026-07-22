@@ -145,6 +145,7 @@
     return true;
   }
 
+
   function repairLegacyVerseSuffixes(score, options = {}) {
     const minimumMatches = Math.max(2, Number(options.minimumMatches) || 3);
     const minimumRatio = Math.max(0.5, Math.min(1, Number(options.minimumRatio) || 0.8));
@@ -177,7 +178,7 @@
         const value = String(lyric.text || '').trimEnd();
         if (!value.endsWith(suffix) || value.length <= suffix.length) return false;
         const base = value.slice(0, -suffix.length);
-        if (!base.trim() || /\d\test(base)) return false;
+        if (!base.trim() || /\d$/.test(base)) return false;
         return true;
       });
 
