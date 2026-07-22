@@ -70,7 +70,15 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  mainWindow.webContents.once('did-finish-load', () => {
+  mainWindow.webContents.once('did-finish-load', async () => {
+    try {
+      const staffKeyRules = await fs.readFile(path.join(__dirname, 'ui', 'staff-key-rules.css'), 'utf8');
+      await mainWindow.webContents.insertCSS(staffKeyRules);
+      logWindowsValidation('staff-key-rules-loaded');
+    } catch (error) {
+      logWindowsValidation('staff-key-rules-load-failed', { error: error?.message || String(error) });
+      throw error;
+    }
     logWindowsValidation('renderer-load-finished');
   });
   if (process.argv.includes('--dev')) mainWindow.webContents.openDevTools({ mode: 'detach' });
