@@ -2,7 +2,7 @@
   "name": "airmonlink-composer",
   "version": "1.1.0",
   "description": "Airmonlink Composer - intelligent music notation, harmony and tonic sol-fa desktop application",
-  "main": "src/bootstrap.js",
+  "main": "src/release-bootstrap.js",
   "author": "Airmonlink",
   "license": "UNLICENSED",
   "private": true,
@@ -57,7 +57,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "perMachine": true,
-      "artifactName": "Airmonlink-Composer-${version}-Build15-Setup.${ext}",
+      "artifactName": "Airmonlink-Composer-${version}-Build16-Setup.${ext}",
       "runAfterFinish": false
     },
     "linux": {
@@ -77,9 +77,9 @@
       }
     ],
     "portable": {
-      "artifactName": "Airmonlink-Composer-${version}-Build15-Portable.${ext}"
+      "artifactName": "Airmonlink-Composer-${version}-Build16-Portable.${ext}"
     },
-    "buildVersion": "1.1.0.15"
+    "buildVersion": "1.1.0.16"
   },
-  "buildNumber": "15"
+  "buildNumber": "16"
 }
