@@ -1,8 +1,10 @@
 (() => {
   'use strict';
 
-  const BUILD_LABEL = 'Build 16';
-  const VARSION_LABEL = 'Airmonlink Composer 1.1.0 · Build 16';
+  const BUILD = 16;
+  const BUILD_LABEL = `Build ${BUILD}`;
+  const VERSION_LABEL = `Airmonlink Composer 1.1.0 · Build ${BUILD}`;
+  let scheduled = false;
 
   function createButton(kind, title, description) {
     const button = document.createElement('button');
@@ -20,32 +22,41 @@
     const badge = document.createElement('small');
     badge.dataset.build16Badge = 'true';
     badge.textContent = BUILD_LABEL;
-    badge.title = 'Delivers dedicated PDF and numbered PNG publishing';
-    Object.assign(badge.style, { marginLeft: '8px', padding: '2px 6px', borderRadius: '999px', fontSize: '11px', fontWeight: '700', background: 'rgba(46, 160, 67, 0.15)' });
+    badge.title = 'Dedicated PDF and numbered PNG publishing';
+    Object.assign(badge.style, {
+      marginLeft: '8px',
+      padding: '2px 6px',
+      borderRadius: '999px',
+      fontSize: '11px',
+      fontWeight: '700',
+      background: 'rgba(46, 160, 67, 0.15)'
+    });
     brand.appendChild(badge);
   }
 
   function updateAbout() {
     const about = document.querySelector('#aboutDialog .about-content strong');
-    if (about) about.textContent = VERSION_LABEL;
+    if (about && about.textContent !== VERSION_LABEL) about.textContent = VERSION_LABEL;
   }
 
   function installExportDialog() {
     const dialog = document.getElementById('exportDialog');
-    if (!dialog) return;
-    const grid = dialog.querySelector('.export-grid');
-    if (!grid) return;
-    grid.querySelectorAll('[data-build-16-publish]').forEach(node => node.remove());
+    const grid = dialog?.querySelector('.export-grid');
+    if (!grid || grid.querySelector('[data-build-16-publish]')) return;
+
     const legacy = grid.querySelector('[data-export="print"]');
     if (legacy) {
-      legacy.querySelector('strong').textContent = 'System Print';
-      legacy.querySelector('small').textContent = 'Legacy print dialog fallback';
+      const strong = legacy.querySelector('strong');
+      const small = legacy.querySelector('small');
+      if (strong) strong.textContent = 'System Print';
+      if (small) small.textContent = 'Legacy print-dialog fallback';
     }
-    const pdf = createButton('pdf', 'Dedicated PDF', 'Multi-page publication with preserved page size');
+
+    const pdf = createButton('pdf', 'Dedicated PDF', 'Multi-page document with preserved physical page size');
     const png = createButton('png', 'PNG Pages', 'Numbered high-resolution image sequence');
     if (legacy) {
+      grid.insertBefore(pdf, legacy);
       grid.insertBefore(png, legacy);
-      grid.insertBefore(pdf, png);
     } else {
       grid.append(pdf, png);
     }
@@ -53,16 +64,18 @@
 
   function installExportMenu() {
     const menu = document.getElementById('exportMenu');
-    if (!menu) return;
-    menu.querySelectorAll('[data-build-16-menu]').forEach(node => node.remove());
+    if (!menu || menu.querySelector('[data-build-16-menu]')) return;
     const legacy = menu.querySelector('[data-command="print"]');
-    [['pdf', 'Dedicated PDF…'], ['png', 'Export PNG pages…"]].forEach(([kind, label]) => {
+    [
+      ['pdf', 'Dedicated PDF…'],
+      ['png', 'Export PNG pages…']
+    ].forEach(([kind, label]) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
       button.dataset.publishKind = kind;
       button.dataset.build16Menu = 'true';
-      if (legacy) amenu.insertBefore(button, legacy);
+      if (legacy) menu.insertBefore(button, legacy);
       else menu.appendChild(button);
     });
   }
@@ -82,11 +95,24 @@
     installExportDialog();
     installExportMenu();
     installStatus();
-    document.documentElement.dataset.airmonBuild = '16';
+    document.documentElement.dataset.airmonBuild = String(BUILD);
   }
 
-  const observer = new MutationObserver(install);
+  function scheduleInstall() {
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      install();
+    });
+  }
+
+  const observer = new MutationObserver(scheduleInstall);
   observer.observe(document.documentElement, { childList: true, subtree: true });
   install();
-  window.AirmonPublishingExposure = Object.freeze({ build: 16, refresh: install });
+
+  window.AirmonPublishingExposure = Object.freeze({
+    build: BUILD,
+    refresh: install
+  });
 })();
