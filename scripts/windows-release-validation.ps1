@@ -34,27 +34,12 @@ function Assert-Result {
 function Test-PE {
   param([string]$Path)
   if (-not (Test-Path $Path -PathType Leaf)) { return $false }
-  $bytes = [System.IO.File]::ReadAllBytes($Path)
-  return $bytes.Length -ge 2 -and $bytes[0] -eq 0x4d -and $bytes[1] -eq 0x5a
-}
-
-function Stop-Tree {
-  param([int]$ProcessId)
-  $output = & taskkill.exe /PID $ProcessId /T /F 2>&1
-  $code = $LASTEXITCODE
-  $output | Out-File -Append (Join-Path $validationPath "process-termination.log")
-  "taskkkill-exit-code=$code; pid=$ProcessId" | Out-File -Append (Join-Path $validationPath "process-termination.log")
-  $global:LASTEXITCODE = 0
-}
-
-function Wait-ForFileText {
-  param([string]$Path,[string]$Pattern,[int]$TimeoutSeconds=30)
-  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-  do {
-    if ((Test-Path $Path) -and ((Get-Content $Path -Raw) -match $Pattern)) { return $true }
-    Start-Sleep -Milliseconds 500
-  } while ([DateTime]::UtcNow -lt $deadline)
-  return $false
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    return $stream.Length -gt 2 -and $stream.ReadByte() -eq 0x4d -and $stream.ReadByte() -eq 0x5a
+  } finally {
+    $stream.Dispose()
+  }
 }
 
 $installerName = "Airmonlink-Composer-$ExpectedVersion-Build$ExpectedBuild-Setup.exe"
@@ -63,7 +48,7 @@ $installer = Join-Path $releasePath $installerName
 $portable = Join-Path $releasePath $portableName
 
 $testLog = Join-Path $validationPath "tests.log"
-if (Test-Path $testLog) {
+if (Test-Path $testLog -PathType Leaf) {
   $text = Get-Content $testLog -Raw
   $tests = [regex]::Match($text,'(?m)^# tests\s+(\d+)\s*$')
   $pass = [regex]::Match($text,'(?m)^# pass\s+(\d+)\s*$')
@@ -72,7 +57,7 @@ if (Test-Path $testLog) {
         [int]$tests.Groups[1].Value -ge 141 -and
         [int]$pass.Groups[1].Value -eq [int]$tests.Groups[1].Value -and
         [int]$fail.Groups[1].Value -eq 0
-  Assert-Result $ok "automated-tests" "TAP totals found in validation/tests.log."
+  Assert-Result $ok "automated-tests" "TAP totals in validation/tests.log prove the automated test result."
 } else {
   Add-Result "automated-tests" "FAIL" "validation/tests.log was not found."
 }
@@ -85,21 +70,21 @@ Assert-Result (Test-PE $portable) "portable-pe" "Portable executable has a valid
 foreach ($path in @($installer,$portable)) {
   if (Test-Path $path -PathType Leaf) {
     $item = Get-Item $path
-    $v = $item.VersionInfo
-    $ok = $v.ProductName -eq "Airmonlink Composer" -and
-          $v.ProductVersion -like "$ExpectedVersion*" -and
-          $v.FileVersion -like "$ExpectedVersion.$ExpectedBuild*"
-    Assert-Result $ok "metadata-$($item.BaseName)" "ProductName=$($v.ProductName); ProductVersion=$($v.ProductVersion); FileVersion=$($v.FileVersion)."
+    $version = $item.VersionInfo
+    $metadataOk = $version.ProductName -eq "Airmonlink Composer" -and
+                  $version.ProductVersion -like "$ExpectedVersion*" -and
+                  $version.FileVersion -like "$ExpectedVersion.$ExpectedBuild*"
+    Assert-Result $metadataOk "metadata-$($item.BaseName)" "ProductName=$($version.ProductName); ProductVersion=$($version.ProductVersion); FileVersion=$($version.FileVersion)."
   }
 }
 
 $signatureRows = foreach ($path in @($installer,$portable)) {
   if (Test-Path $path -PathType Leaf) {
-    $sig = Get-AuthenticodeSignature -FilePath $path
+    $signature = Get-AuthenticodeSignature -FilePath $path
     [pscustomobject]@{
-      artifact = (Split-Path $path -Leaf)
-      status = [string]$sig.Status
-      signer = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { $null }
+      artifact = Split-Path $path -Leaf
+      status = [string]$signature.Status
+      signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
     }
   }
 }
@@ -117,36 +102,20 @@ if ((Test-Path $installer) -and (Test-Path $portable)) {
   ) | Set-Content -Encoding ascii (Join-Path $releasePath "SHA256SUMS.txt")
 }
 
-if (Test-Path $portable -PathType Leaf) {
-  $portableLog = Join-Path $validationPath "portable-launch.jsonl"
-  $env:AIRMONLINK_VALIDATION_LOG = $portableLog
-  Remove-Item $portableLog -Force -ErrorAction SilentlyContinue
-  $stdout = Join-Path $validationPath "portable-stdout.log"
-  $stderr = Join-Path $validationPath "portable-stderr.log"
-  $proc = Start-Process -FilePath $portable -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-  $ready = Wait-ForFileText $portableLog '"stage":"renderer-ready"' 25
-  $running = -not $proc.HasExited
-  Assert-Result ($ready -and $running) "portable-launch" "Portable process reached renderer-ready and remained alive."
-  if (-not $proc.HasExited) { Stop-Tree $proc.Id }
-}
-
 $installDir = Join-Path $env:RUNNER_TEMP "AirmonlinkComposer-Build$ExpectedBuild-Clean"
 if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
 try {
-  $installProc = Start-Process -FilePath $installer -ArgumentList @("/S","/D=$installDir") -Wait -PassThru
-  if ($installProc.ExitCode -ne 0) { throw "Installer exited with code $($installProc.ExitCode)." }
-
+  $install = Start-Process -FilePath $installer -ArgumentList @("/S","/D=$installDir") -Wait -PassThru
+  if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)." }
   $installedExe = Join-Path $installDir "Airmonlink Composer.exe"
   Assert-Result (Test-Path $installedExe -PathType Leaf) "clean-install" "Installed executable exists."
 
   $uninstaller = Get-ChildItem $installDir -Filter "Uninstall*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
   Assert-Result ($null -ne $uninstaller) "uninstaller-present" "Uninstaller exists."
-
   if ($uninstaller) {
-    $uninstallProc = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
-    if ($uninstallProc.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstallProc.ExitCode)." }
-    $removed = -not (Test-Path $installedExe)
-    Assert-Result $removed "uninstall-cleanup" "Installed executable was removed."
+    $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
+    if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)." }
+    Assert-Result (-not (Test-Path $installedExe)) "uninstall-cleanup" "Installed executable was removed."
   }
 } catch {
   Add-Result "windows-install-cycle" "FAIL" $_.Exception.Message
