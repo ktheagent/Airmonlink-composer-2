@@ -97,13 +97,13 @@ test('desktop file service saves atomically, backs up, locks, tracks recent file
   await fs.rm(root, { recursive: true, force: true });
 });
 
-test('airscore v8 keeps application workspace settings outside score content', () => {
+test('current airscore schema keeps application workspace settings outside score content', () => {
   const airscore = require('../src/core/airscore');
   const score = model.createScore({ template: 'lead' });
   score.settings.workspace = 'advanced';
   const payload = JSON.parse(airscore.serialize(score));
-  assert.equal(payload.version, 8);
-  assert.equal(payload.schema, 'airscore-v9');
+  assert.equal(payload.version, 9);
+  assert.equal(payload.schema, 'airscore-v10');
   assert.equal(payload.score.settings.workspace, undefined);
   const reopened = airscore.deserialize(payload);
   assert.equal(reopened.formatVersion, 9);
