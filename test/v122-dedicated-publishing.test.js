@@ -116,11 +116,11 @@ test('desktop backend and renderer expose dedicated PDF and numbered PNG publish
   assert.match(ui, /score-page-sheet/);
 });
 
-test('Build 16 package metadata names both Windows artifacts consistently', () => {
+test('Build 17 package metadata names both Windows artifacts consistently', () => {
   const pkg = require('../package.json');
-  assert.equal(pkg.main, 'src/release-bootstrap.js');
-  assert.equal(pkg.buildNumber, '16');
-  assert.equal(pkg.build.buildVersion, '1.1.0.16');
-  assert.match(pkg.build.nsis.artifactName, /Build16/);
-  assert.match(pkg.build.portable.artifactName, /Build16/);
+  assert.equal(pkg.main, 'src/bootstrap.js');
+  assert.equal(pkg.buildNumber, '17');
+  assert.equal(pkg.build.buildVersion, '1.1.0.17');
+  assert.match(pkg.build.nsis.artifactName, /Build17/);
+  assert.match(pkg.build.portable.artifactName, /Build17/);
 });
