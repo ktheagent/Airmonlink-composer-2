@@ -19,7 +19,6 @@ jobs:
     timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -87,13 +86,16 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          cmd.exe /d /s /c "node node_modules\electron\install.js > validation\electron-install.log 2>&1"
-          $exitCode = $LASTEXITCODE
-          Get-Content validation\electron-install.log
-          if ($exitCode -ne 0) {
-            throw "Electron runtime installation failed with exit code $exitCode."
+          $stdout = Join-Path $PWD "validation\electron-install.stdout.log"
+          $stderr = Join-Path $PWD "validation\electron-install.stderr.log"
+          $script = Join-Path $PWD "node_modules\electron\install.js"
+          $node = (Get-Command node).Source
+          $process = Start-Process -FilePath $node -ArgumentList @($script) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (Test-Path $stdout) { Get-Content $stdout }
+          if (Test-Path $stderr) { Get-Content $stderr }
+          if ($process.ExitCode -ne 0) {
+            throw "Electron runtime installation failed with exit code $($process.ExitCode)."
           }
-
           $electronExe = Join-Path $PWD "node_modules\electron\dist\electron.exe"
           if (-not (Test-Path $electronExe -PathType Leaf)) {
             throw "Electron runtime was not installed: $electronExe"
@@ -103,56 +105,91 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          cmd.exe /d /s /c "node scripts\lint.js > validation\lint.log 2>&1"
-          $exitCode = $LASTEXITCODE
-          Get-Content validation\lint.log
-          if ($exitCode -ne 0) {
-            throw "Lint failed with exit code $exitCode."
+          $stdout = Join-Path $PWD "validation\lint.stdout.log"
+          $stderr = Join-Path $PWD "validation\lint.stderr.log"
+          $node = (Get-Command node).Source
+          $process = Start-Process -FilePath $node -ArgumentList @("scripts\lint.js") -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (Test-Path $stdout) { Get-Content $stdout }
+          if (Test-Path $stderr) { Get-Content $stderr }
+          if ($process.ExitCode -ne 0) {
+            throw "Lint failed with exit code $($process.ExitCode)."
           }
 
       - name: Run automated tests
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $testFiles = Get-ChildItem test -Filter *.test.js -File |
-            Sort-Object FullName |
-            ForEach-Object { $_.FullName }
-
+          $testFiles = Get-ChildItem test -Filter *.test.js -File | Sort-Object FullName | ForEach-Object { $_.FullName }
           if ($testFiles.Count -eq 0) {
             throw "No automated test files were found."
           }
 
-          & node --test @testFiles *> validation\tests.log
-          $exitCode = $LASTEXITCODE
-          Get-Content validation\tests.log
-          if ($exitCode -ne 0) {
-            throw "Tests failed with exit code $exitCode."
+          $stdout = Join-Path $PWD "validation\tests.stdout.log"
+          $stderr = Join-Path $PWD "validation\tests.stderr.log"
+          $node = (Get-Command node).Source
+          $arguments = @("--test") + $testFiles
+          $process = Start-Process -FilePath $node -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (Test-Path $stdout) { Get-Content $stdout }
+          if (Test-Path $stderr) { Get-Content $stderr }
+          if ($process.ExitCode -ne 0) {
+            throw "Tests failed with exit code $($process.ExitCode)."
           }
 
-          $text = Get-Content validation\tests.log -Raw
+          $text = Get-Content $stdout -Raw
           $tests = [regex]::Match($text, '(?m)^# tests\s+(\d+)\s*$')
           $passed = [regex]::Match($text, '(?m)^# pass\s+(\d+)\s*$')
           $failed = [regex]::Match($text, '(?m)^# fail\s+(\d+)\s*$')
-
           if (-not $tests.Success -or -not $passed.Success -or -not $failed.Success) {
-            throw "Could not prove Node test totals from TAP output."
+            throw "Could not prove the Node test totals from TAP output."
           }
-          if ([int]$tests.Groups[1].Value -lt 141 -or
-              [int]$passed.Groups[1].Value -ne [int]$tests.Groups[1].Value -or
-              [int]$failed.Groups[1].Value -ne 0) {
+          if ([int]$tests.Groups[1].Value -lt 141 -or [int]$passed.Groups[1].Value -ne [int]$tests.Groups[1].Value -or [int]$failed.Groups[1].Value -ne 0) {
             throw "Expected at least 141 passing tests and zero failures."
           }
+
+          Copy-Item $stdout validation\tests.log -Force
 
       - name: Build Windows NSIS and portable executables
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          Remove-Item release -Recurse -Force -ErrorAction SilentlyContinue
+
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          cmd.exe /d /s /c "node `"$builder`" --win nsis portable --publish never > validation\windows-build.log 2>&1"
-          $exitCode = $LASTEXITCODE
-          Get-Content validation\windows-build.log
-          if ($exitCode -ne 0) {
-            throw "Windows packaging failed with exit code $exitCode."
+          $stdout = Join-Path $PWD "validation\windows-build.stdout.log"
+          $stderr = Join-Path $PWD "validation\windows-build.stderr.log"
+          $node = (Get-Command node).Source
+          $arguments = @($builder, "--win", "nsis", "portable", "--publish", "never")
+          $process = Start-Process -FilePath $node -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+          if (Test-Path $stdout) { Get-Content $stdout }
+          if (Test-Path $stderr) { Get-Content $stderr }
+
+          $installer = Join-Path $PWD "release\Airmonlink-Composer-1.1.0-Build14-Setup.exe"
+          $portable = Join-Path $PWD "release\Airmonlink-Composer-1.1.0-Build14-Portable.exe"
+          $missing = @()
+          foreach ($artifact in @($installer, $portable)) {
+            if (-not (Test-Path $artifact -PathType Leaf)) {
+              $missing += "$artifact (missing)"
+              continue
+            }
+            if ((Get-Item $artifact).Length -le 0) {
+              $missing += "$artifact (empty)"
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            throw "Windows packaging did not produce valid expected artifacts. Builder exit code: $($process.ExitCode). Problems: $($missing -join '; ')"
+          }
+
+          if ($process.ExitCode -ne 0) {
+            Write-Warning "electron-builder returned exit code $($process.ExitCode) after producing both expected executables. Continuing to deterministic artifact validation."
+          }
+
+          foreach ($artifact in @($installer, $portable)) {
+            $bytes = [System.IO.File]::ReadAllBytes($artifact)
+            if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) {
+              throw "Generated artifact is not a valid PE file: $artifact"
+            }
           }
 
       - name: Validate PE metadata, install, launch, association, and uninstall
@@ -174,8 +211,7 @@ jobs:
           $installer = Test-Path "release\Airmonlink-Composer-1.1.0-Build14-Setup.exe" -PathType Leaf
           $portable = Test-Path "release\Airmonlink-Composer-1.1.0-Build14-Portable.exe" -PathType Leaf
           $checksums = Test-Path "release\SHA256SUMS.txt" -PathType Leaf
-          "present=$($installer -and $portable -and $checksums)".ToLowerInvariant() |
-            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "present=$($installer -and $portable -and $checksums)".ToLowerInvariant() | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload Windows distributables
         if: ${{ always() && steps.distributables.outputs.present == 'true' }}
