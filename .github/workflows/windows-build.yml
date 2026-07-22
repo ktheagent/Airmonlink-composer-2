@@ -19,7 +19,6 @@ jobs:
     timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      NPM_CONFIG_CACHE: ${{ github.workspace }}\.npm-cache
 
     steps:
       - name: Checkout
@@ -30,43 +29,31 @@ jobs:
         with:
           node-version: "22.22.2"
 
-      - name: Install locked dependencies without lifecycle scripts
+      - name: Install locked dependencies with pnpm
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force validation | Out-Null
           Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item $env:NPM_CONFIG_CACHE -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item pnpm-lock.yaml -Force -ErrorAction SilentlyContinue
           Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_PRODUCTION -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_OMIT -ErrorAction SilentlyContinue
 
-          node --version | Tee-Object validation/toolchain.log
-          npm --version | Tee-Object validation/toolchain.log -Append
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not activate pnpm 10.14.0."
+          }
 
-          cmd.exe /d /s /c "npm ci --include=dev --ignore-scripts --no-audit --no-fund > validation\npm-ci.log 2>&1"
-          $npmExit = $LASTEXITCODE
-          Get-Content validation/npm-ci.log
+          pnpm import
+          if ($LASTEXITCODE -ne 0) {
+            throw "pnpm could not import package-lock.json."
+          }
 
-          if ($npmExit -ne 0) {
-            $log = Get-Content validation/npm-ci.log -Raw
-            if ($log -notmatch "Exit handler never called") {
-              throw "npm ci failed with exit code $npmExit."
-            }
-
-            Write-Host "npm CLI hit its internal exit-handler defect; using a lockfile-derived pnpm install."
-            Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item pnpm-lock.yaml -Force -ErrorAction SilentlyContinue
-            corepack enable
-            corepack prepare pnpm@10.14.0 --activate
-            pnpm import
-            if ($LASTEXITCODE -ne 0) {
-              throw "pnpm could not import package-lock.json."
-            }
-            pnpm install --frozen-lockfile --ignore-scripts
-            if ($LASTEXITCODE -ne 0) {
-              throw "pnpm fallback install failed."
-            }
+          pnpm install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) {
+            throw "pnpm dependency installation failed."
           }
 
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
@@ -77,11 +64,10 @@ jobs:
             }
           }
 
-          $lock = Get-Content package-lock.json -Raw | ConvertFrom-Json
-          $expectedBuilder = $lock.packages.'node_modules/electron-builder'.version
-          $expectedElectron = $lock.packages.'node_modules/electron'.version
-          $actualBuilder = (Get-Content node_modules/electron-builder/package.json -Raw | ConvertFrom-Json).version
-          $actualElectron = (Get-Content node_modules/electron/package.json -Raw | ConvertFrom-Json).version
+          $expectedBuilder = (node -p "require('./package-lock.json').packages['node_modules/electron-builder'].version").Trim()
+          $expectedElectron = (node -p "require('./package-lock.json').packages['node_modules/electron'].version").Trim()
+          $actualBuilder = (node -p "require('./node_modules/electron-builder/package.json').version").Trim()
+          $actualElectron = (node -p "require('./node_modules/electron/package.json').version").Trim()
 
           if ($actualBuilder -ne $expectedBuilder) {
             throw "electron-builder version mismatch: expected $expectedBuilder, found $actualBuilder."
@@ -90,18 +76,22 @@ jobs:
             throw "Electron version mismatch: expected $expectedElectron, found $actualElectron."
           }
 
-          "electron-builder=$actualBuilder" | Tee-Object validation/dependency-versions.log
-          "electron=$actualElectron" | Tee-Object validation/dependency-versions.log -Append
-          node $builder --version
+          @(
+            "node=$(node --version)"
+            "pnpm=$(pnpm --version)"
+            "electron-builder=$actualBuilder"
+            "electron=$actualElectron"
+          ) | Set-Content validation\dependency-versions.log
 
-      - name: Install the locked Electron runtime
+      - name: Install locked Electron runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $electronInstall = Join-Path $PWD "node_modules\electron\install.js"
-          node $electronInstall *>&1 | Tee-Object validation/electron-install.log
-          if ($LASTEXITCODE -ne 0) {
-            throw "Electron runtime installation failed with exit code $LASTEXITCODE."
+          cmd.exe /d /s /c "node node_modules\electron\install.js > validation\electron-install.log 2>&1"
+          $exitCode = $LASTEXITCODE
+          Get-Content validation\electron-install.log
+          if ($exitCode -ne 0) {
+            throw "Electron runtime installation failed with exit code $exitCode."
           }
 
           $electronExe = Join-Path $PWD "node_modules\electron\dist\electron.exe"
@@ -113,9 +103,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          node scripts/lint.js *>&1 | Tee-Object validation/lint.log
-          if ($LASTEXITCODE -ne 0) {
-            throw "Lint failed with exit code $LASTEXITCODE."
+          cmd.exe /d /s /c "node scripts\lint.js > validation\lint.log 2>&1"
+          $exitCode = $LASTEXITCODE
+          Get-Content validation\lint.log
+          if ($exitCode -ne 0) {
+            throw "Lint failed with exit code $exitCode."
           }
 
       - name: Run automated tests
@@ -130,17 +122,20 @@ jobs:
             throw "No automated test files were found."
           }
 
-          & node --test @testFiles *>&1 | Tee-Object validation/tests.log
-          if ($LASTEXITCODE -ne 0) {
-            throw "Tests failed with exit code $LASTEXITCODE."
+          & node --test @testFiles *> validation\tests.log
+          $exitCode = $LASTEXITCODE
+          Get-Content validation\tests.log
+          if ($exitCode -ne 0) {
+            throw "Tests failed with exit code $exitCode."
           }
 
-          $text = Get-Content validation/tests.log -Raw
+          $text = Get-Content validation\tests.log -Raw
           $tests = [regex]::Match($text, '(?m)^# tests\s+(\d+)\s*$')
           $passed = [regex]::Match($text, '(?m)^# pass\s+(\d+)\s*$')
           $failed = [regex]::Match($text, '(?m)^# fail\s+(\d+)\s*$')
+
           if (-not $tests.Success -or -not $passed.Success -or -not $failed.Success) {
-            throw "Could not prove the Node test totals from TAP output."
+            throw "Could not prove Node test totals from TAP output."
           }
           if ([int]$tests.Groups[1].Value -lt 141 -or
               [int]$passed.Groups[1].Value -ne [int]$tests.Groups[1].Value -or
@@ -153,20 +148,22 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          node $builder --win nsis portable *>&1 |
-            Tee-Object validation/windows-build.log
-          if ($LASTEXITCODE -ne 0) {
-            throw "Windows packaging failed with exit code $LASTEXITCODE."
+          cmd.exe /d /s /c "node `"$builder`" --win nsis portable > validation\windows-build.log 2>&1"
+          $exitCode = $LASTEXITCODE
+          Get-Content validation\windows-build.log
+          if ($exitCode -ne 0) {
+            throw "Windows packaging failed with exit code $exitCode."
           }
 
       - name: Validate PE metadata, install, launch, association, and uninstall
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          & ./scripts/windows-release-validation.ps1 *>&1 |
-            Tee-Object validation/windows-validation.log
-          if ($LASTEXITCODE -ne 0) {
-            throw "Windows release validation failed with exit code $LASTEXITCODE."
+          & .\scripts\windows-release-validation.ps1 *> validation\windows-validation.log
+          $exitCode = $LASTEXITCODE
+          Get-Content validation\windows-validation.log
+          if ($exitCode -ne 0) {
+            throw "Windows release validation failed with exit code $exitCode."
           }
 
       - name: Detect distributables
@@ -174,9 +171,9 @@ jobs:
         id: distributables
         shell: pwsh
         run: |
-          $installer = Test-Path "release/Airmonlink-Composer-1.1.0-Build14-Setup.exe" -PathType Leaf
-          $portable = Test-Path "release/Airmonlink-Composer-1.1.0-Build14-Portable.exe" -PathType Leaf
-          $checksums = Test-Path "release/SHA256SUMS.txt" -PathType Leaf
+          $installer = Test-Path "release\Airmonlink-Composer-1.1.0-Build14-Setup.exe" -PathType Leaf
+          $portable = Test-Path "release\Airmonlink-Composer-1.1.0-Build14-Portable.exe" -PathType Leaf
+          $checksums = Test-Path "release\SHA256SUMS.txt" -PathType Leaf
           "present=$($installer -and $portable -and $checksums)".ToLowerInvariant() |
             Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
