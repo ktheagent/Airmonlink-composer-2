@@ -5,7 +5,7 @@
   root.AirmonAirscore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (model) {
   'use strict';
-  const CURRENT_VERSION = 8;
+  const CURRENT_VERSION = 9;
 
   function serialize(score) {
     const normalized = model?.normalizeScore ? model.normalizeScore(model.cloneScore ? model.cloneScore(score) : JSON.parse(JSON.stringify(score))) : score;
@@ -14,7 +14,7 @@
     return JSON.stringify({
       signature: 'AIRM-Score',
       version: CURRENT_VERSION,
-      schema: 'airscore-v9',
+      schema: 'airscore-v10',
       savedAt: new Date().toISOString(),
       checksumAlgorithm: 'fnv1a32',
       checksum: checksum(scoreText),
@@ -85,8 +85,11 @@
       migrated.score.solfaMigrationReport = Array.isArray(migrated.score.solfaMigrationReport) ? migrated.score.solfaMigrationReport : [];
       migrated.score.solfaMigrationReport.push({ version: 9, status: 'migrated', convention: migrated.score.settings.solfaConvention, message: 'Formal tonic-solfa grammar settings were added without changing structured musical events.' });
     }
+    if (migrated.version < 9 && model?.repairLegacyLyricVerseSuffixes) {
+      model.repairLegacyLyricVerseSuffixes(migrated.score);
+    }
     migrated.version = CURRENT_VERSION;
-    migrated.schema = 'airscore-v9';
+    migrated.schema = 'airscore-v10';
     return migrated;
   }
 
