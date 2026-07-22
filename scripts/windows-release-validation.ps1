@@ -22,9 +22,11 @@ $setupPath = Join-Path $release $expectedSetup
 $portablePath = Join-Path $release $expectedPortable
 
 $rows = [System.Collections.Generic.List[object]]::new()
+
 function Add-Row([string]$Name, [string]$Status, [string]$Details) {
   $rows.Add([pscustomobject]@{ Name = $Name; Status = $Status; Details = $Details })
 }
+
 function Assert-Check([bool]$Condition, [string]$Name, [string]$Details) {
   if ($Condition) { Add-Row $Name "PASS" $Details }
   else { Add-Row $Name "FAIL" $Details }
@@ -45,6 +47,7 @@ $requiredSource = @(
   "test\v122-dedicated-publishing.test.js",
   "test\v123-build16-publishing-exposure.test.js"
 )
+
 foreach ($relative in $requiredSource) {
   Assert-Check (Test-Path (Join-Path $root $relative)) "Required source: $relative" $relative
 }
@@ -53,21 +56,25 @@ $releaseBootstrapPath = Join-Path $root "src\release-bootstrap.js"
 $releaseBootstrapSource = if (Test-Path $releaseBootstrapPath) { Get-Content $releaseBootstrapPath -Raw } else { "" }
 Assert-Check ($releaseBootstrapSource -match "const BUILD = $ExpectedBuild;") "Exposure build identity" "release-bootstrap.js declares Build $ExpectedBuild"
 Assert-Check ($releaseBootstrapSource -match "publishing-exposure\.js") "Exposure source wiring" "release-bootstrap.js loads publishing-exposure.js"
-Assert-Check ($releaseBootstrapSource -match "require\('\\.\\/bootstrap'\)") "Desktop bootstrap chaining" "Release-bootstrap.js chains to src/bootstrap.js"
+Assert-Check ($releaseBootstrapSource -match "require\('\\.\\/bootstrap'\)") "Desktop bootstrap chaining" "release-bootstrap.js chains to src/bootstrap.js"
 
 Assert-Check (Test-Path $setupPath) "Setup artifact exists" $setupPath
 Assert-Check (Test-Path $portablePath) "Portable artifact exists" $portablePath
 
 function Test-PeFile([string]$Path) {
   if (-not (Test-Path $Path)) { return $false }
+
   $stream = [System.IO.File]::OpenRead($Path)
   try {
     if ($stream.Length -lt 1024) { return $false }
+
     $reader = [System.IO.BinaryReader]::new($stream)
-    if ($reader.ReadUInt16() -ne 0x5A4Di) { return $false }
+    if ($reader.ReadUInt16() -ne 0x5A4D) { return $false }
+
     $stream.Position = 0x3C
     $peOffset = $reader.ReadInt32()
     if ($peOffset -lt 64 -or $peOffset -gt ($stream.Length - 4)) { return $false }
+
     $stream.Position = $peOffset
     return $reader.ReadUInt32() -eq 0x00004550
   } finally {
@@ -76,12 +83,13 @@ function Test-PeFile([string]$Path) {
 }
 
 Assert-Check (Test-PeFile $setupPath) "Setup PE validation" "MZ and PE magic signatures"
-Assert-Check (Test-PeFile $portablePath) "Portable PE validation" "MZ; and PE magic signatures"
+Assert-Check (Test-PeFile $portablePath) "Portable PE validation" "MZ and PE magic signatures"
 
 if (Test-Path $setupPath) {
   $setupInfo = Get-Item $setupPath
   Assert-Check ($setupInfo.Length -gt 10MB) "Setup size sanity" "$($setupInfo.Length) bytes"
 }
+
 if (Test-Path $portablePath) {
   $portableInfo = Get-Item $portablePath
   Assert-Check ($portableInfo.Length -gt 10MB) "Portable size sanity" "$($portableInfo.Length) bytes"
@@ -91,9 +99,10 @@ $hashLines = @()
 foreach ($file in @($setupPath, $portablePath)) {
   if (Test-Path $file) {
     $hash = Get-FileHash $file -Algorithm SHA256
-    $hashLines += "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($file))"
+    $hashLines += "$($hash.Hash.ToLowerInvariant()) $([IO.Path]::GetFileName($file))"
   }
 }
+
 $hashPath = Join-Path $release "SHA256SUMS.txt"
 $hashLines | Set-Content -Encoding ascii $hashPath
 Assert-Check ((Test-Path $hashPath) -and ((Get-Item $hashPath).Length -gt 100)) "SHA256 manifest" $hashPath
@@ -105,6 +114,7 @@ if (Test-Path $portablePath) {
     Start-Sleep -Seconds 8
     $alive = -not $process.HasExited
     Assert-Check $alive "Portable launch smoke test" "Process started and remained alive for 8 seconds"
+
     if ($alive) {
       $process.CloseMainWindow() | Out-Null
       Start-Sleep -Seconds 3
