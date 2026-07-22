@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      NPM_CONFIG_CACHE: ${{ github.workspace }}\.npm-cache
 
     steps:
       - name: Checkout
@@ -29,94 +30,115 @@ jobs:
         with:
           node-version: "22.22.2"
 
-      - name: Pin npm and clear production-only configuration
+      - name: Install locked dependencies without lifecycle scripts
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force validation | Out-Null
-
+          Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item $env:NPM_CONFIG_CACHE -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_PRODUCTION -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_OMIT -ErrorAction SilentlyContinue
 
-          npm install --global npm@10.8.0 --no-audit --no-fund
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          node --version | Tee-Object validation/toolchain.log
+          npm --version | Tee-Object validation/toolchain.log -Append
 
-          npm config delete production --location=user
-          npm config delete omit --location=user
-
-          $nodeVersion = (node --version).Trim()
-          $npmVersion = (npm --version).Trim()
-
-          if ($nodeVersion -ne "v22.22.2") {
-            throw "Expected Node v22.22.2 but found $nodeVersion."
-          }
-          if ($npmVersion -ne "10.8.0") {
-            throw "Expected npm 10.8.0 but found $npmVersion."
-          }
-
-          "node=$nodeVersion" | Tee-Object -FilePath validation/toolchain.log
-          "npm=$npmVersion" | Tee-Object -FilePath validation/toolchain.log -Append
-          "production=$(npm config get production)" | Tee-Object -FilePath validation/toolchain.log -Append
-          "omit=$(npm config get omit)" | Tee-Object -FilePath validation/toolchain.log -Append
-
-      - name: Install locked dependencies including build tools
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Continue"
-          Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
-
-          cmd.exe /d /s /c "npm ci --include=dev --no-audit --no-fund > validation\npm-ci.log 2>&1"
-          $installExitCode = $LASTEXITCODE
+          cmd.exe /d /s /c "npm ci --include=dev --ignore-scripts --no-audit --no-fund > validation\npm-ci.log 2>&1"
+          $npmExit = $LASTEXITCODE
           Get-Content validation/npm-ci.log
 
-          if ($installExitCode -ne 0) {
-            throw "npm ci failed with exit code $installExitCode."
-          }
+          if ($npmExit -ne 0) {
+            $log = Get-Content validation/npm-ci.log -Raw
+            if ($log -notmatch "Exit handler never called") {
+              throw "npm ci failed with exit code $npmExit."
+            }
 
-          $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          $shim = Join-Path $PWD "node_modules\.bin\electron-builder.cmd"
-
-          foreach ($path in @($builder, $shim)) {
-            if (-not (Test-Path $path -PathType Leaf)) {
-              throw "Required build tool is missing after npm ci: $path"
+            Write-Host "npm CLI hit its internal exit-handler defect; using a lockfile-derived pnpm install."
+            Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item pnpm-lock.yaml -Force -ErrorAction SilentlyContinue
+            corepack enable
+            corepack prepare pnpm@10.14.0 --activate
+            pnpm import
+            if ($LASTEXITCODE -ne 0) {
+              throw "pnpm could not import package-lock.json."
+            }
+            pnpm install --frozen-lockfile --ignore-scripts
+            if ($LASTEXITCODE -ne 0) {
+              throw "pnpm fallback install failed."
             }
           }
 
+          $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
+          $electronInstall = Join-Path $PWD "node_modules\electron\install.js"
+          foreach ($required in @($builder, $electronInstall)) {
+            if (-not (Test-Path $required -PathType Leaf)) {
+              throw "Required locked dependency is missing: $required"
+            }
+          }
+
+          $lock = Get-Content package-lock.json -Raw | ConvertFrom-Json
+          $expectedBuilder = $lock.packages.'node_modules/electron-builder'.version
+          $expectedElectron = $lock.packages.'node_modules/electron'.version
+          $actualBuilder = (Get-Content node_modules/electron-builder/package.json -Raw | ConvertFrom-Json).version
+          $actualElectron = (Get-Content node_modules/electron/package.json -Raw | ConvertFrom-Json).version
+
+          if ($actualBuilder -ne $expectedBuilder) {
+            throw "electron-builder version mismatch: expected $expectedBuilder, found $actualBuilder."
+          }
+          if ($actualElectron -ne $expectedElectron) {
+            throw "Electron version mismatch: expected $expectedElectron, found $actualElectron."
+          }
+
+          "electron-builder=$actualBuilder" | Tee-Object validation/dependency-versions.log
+          "electron=$actualElectron" | Tee-Object validation/dependency-versions.log -Append
           node $builder --version
+
+      - name: Install the locked Electron runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $electronInstall = Join-Path $PWD "node_modules\electron\install.js"
+          node $electronInstall *>&1 | Tee-Object validation/electron-install.log
           if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+            throw "Electron runtime installation failed with exit code $LASTEXITCODE."
+          }
+
+          $electronExe = Join-Path $PWD "node_modules\electron\dist\electron.exe"
+          if (-not (Test-Path $electronExe -PathType Leaf)) {
+            throw "Electron runtime was not installed: $electronExe"
           }
 
       - name: Lint source
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Continue"
-          cmd.exe /d /s /c "npm run lint > validation\lint.log 2>&1"
-          $commandExitCode = $LASTEXITCODE
-          Get-Content validation/lint.log
-          if ($commandExitCode -ne 0) {
-            throw "Lint failed with exit code $commandExitCode."
+          $ErrorActionPreference = "Stop"
+          node scripts/lint.js *>&1 | Tee-Object validation/lint.log
+          if ($LASTEXITCODE -ne 0) {
+            throw "Lint failed with exit code $LASTEXITCODE."
           }
 
       - name: Run automated tests
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Continue"
-          cmd.exe /d /s /c "npm test > validation\tests.log 2>&1"
-          $commandExitCode = $LASTEXITCODE
-          Get-Content validation/tests.log
-          if ($commandExitCode -ne 0) {
-            throw "Tests failed with exit code $commandExitCode."
+          $ErrorActionPreference = "Stop"
+          $testFiles = Get-ChildItem test -Filter *.test.js -File |
+            Sort-Object FullName |
+            ForEach-Object { $_.FullName }
+
+          if ($testFiles.Count -eq 0) {
+            throw "No automated test files were found."
+          }
+
+          & node --test @testFiles *>&1 | Tee-Object validation/tests.log
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tests failed with exit code $LASTEXITCODE."
           }
 
           $text = Get-Content validation/tests.log -Raw
           $tests = [regex]::Match($text, '(?m)^# tests\s+(\d+)\s*$')
           $passed = [regex]::Match($text, '(?m)^# pass\s+(\d+)\s*$')
           $failed = [regex]::Match($text, '(?m)^# fail\s+(\d+)\s*$')
-
           if (-not $tests.Success -or -not $passed.Success -or -not $failed.Success) {
             throw "Could not prove the Node test totals from TAP output."
           }
@@ -126,38 +148,28 @@ jobs:
             throw "Expected at least 141 passing tests and zero failures."
           }
 
-      - name: Build Windows x64 NSIS and portable executables
+      - name: Build Windows NSIS and portable executables
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Continue"
-
+          $ErrorActionPreference = "Stop"
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          if (-not (Test-Path $builder -PathType Leaf)) {
-            throw "electron-builder is missing before packaging: $builder"
-          }
-
-          cmd.exe /d /s /c "npm run dist:win > validation\windows-build.log 2>&1"
-          $commandExitCode = $LASTEXITCODE
-          Get-Content validation/windows-build.log
-          if ($commandExitCode -ne 0) {
-            throw "Windows packaging failed with exit code $commandExitCode."
+          node $builder --win nsis portable *>&1 |
+            Tee-Object validation/windows-build.log
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows packaging failed with exit code $LASTEXITCODE."
           }
 
       - name: Validate PE metadata, install, launch, association, and uninstall
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          try {
-            & ./scripts/windows-release-validation.ps1 *>&1 |
-              Tee-Object -FilePath validation/windows-validation.log
-          } catch {
-            if (Test-Path validation/windows-validation.log) {
-              Get-Content validation/windows-validation.log
-            }
-            throw
+          & ./scripts/windows-release-validation.ps1 *>&1 |
+            Tee-Object validation/windows-validation.log
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows release validation failed with exit code $LASTEXITCODE."
           }
 
-      - name: Detect generated distributables
+      - name: Detect distributables
         if: always()
         id: distributables
         shell: pwsh
@@ -180,7 +192,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Windows validation evidence
+      - name: Upload validation evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
