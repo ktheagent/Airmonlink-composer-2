@@ -148,7 +148,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          cmd.exe /d /s /c "node `"$builder`" --win nsis portable > validation\windows-build.log 2>&1"
+          cmd.exe /d /s /c "node `"$builder`" --win nsis portable --publish never > validation\windows-build.log 2>&1"
           $exitCode = $LASTEXITCODE
           Get-Content validation\windows-build.log
           if ($exitCode -ne 0) {
