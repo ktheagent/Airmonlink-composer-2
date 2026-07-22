@@ -3,11 +3,9 @@ name: Validate and Build Windows Release
 "on":
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -19,6 +17,7 @@ jobs:
     timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,201 +25,86 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.22.2"
+          node-version: 22.22.2
 
-      - name: Install locked dependencies with pnpm
+      - name: Enable pnpm
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+          pnpm --version
+
+      - name: Install locked dependencies
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force validation | Out-Null
-          Remove-Item node_modules -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item pnpm-lock.yaml -Force -ErrorAction SilentlyContinue
           Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_PRODUCTION -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_OMIT -ErrorAction SilentlyContinue
-
-          corepack enable
-          corepack prepare pnpm@10.14.0 --activate
-          if ($LASTEXITCODE -ne 0) {
-            throw "Could not activate pnpm 10.14.0."
-          }
-
+          if (Test-Path node_modules) { Remove-Item node_modules -Recurse -Force }
+          if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml -Force }
           pnpm import
-          if ($LASTEXITCODE -ne 0) {
-            throw "pnpm could not import package-lock.json."
-          }
-
+          if ($LASTEXITCODE -ne 0) { throw "pnpm import failed with exit code $LASTEXITCODE." }
           pnpm install --frozen-lockfile --ignore-scripts
-          if ($LASTEXITCODE -ne 0) {
-            throw "pnpm dependency installation failed."
-          }
+          if ($LASTEXITCODE -ne 0) { throw "pnpm install failed with exit code $LASTEXITCODE." }
+          if (-not (Test-Path "node_modules\electron-builder\cli.js")) { throw "electron-builder CLI is missing." }
+          if (-not (Test-Path "node_modules\electron\install.js")) { throw "Electron install script is missing." }
 
-          $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          $electronInstall = Join-Path $PWD "node_modules\electron\install.js"
-          foreach ($required in @($builder, $electronInstall)) {
-            if (-not (Test-Path $required -PathType Leaf)) {
-              throw "Required locked dependency is missing: $required"
-            }
-          }
-
-          $expectedBuilder = (node -p "require('./package-lock.json').packages['node_modules/electron-builder'].version").Trim()
-          $expectedElectron = (node -p "require('./package-lock.json').packages['node_modules/electron'].version").Trim()
-          $actualBuilder = (node -p "require('./node_modules/electron-builder/package.json').version").Trim()
-          $actualElectron = (node -p "require('./node_modules/electron/package.json').version").Trim()
-
-          if ($actualBuilder -ne $expectedBuilder) {
-            throw "electron-builder version mismatch: expected $expectedBuilder, found $actualBuilder."
-          }
-          if ($actualElectron -ne $expectedElectron) {
-            throw "Electron version mismatch: expected $expectedElectron, found $actualElectron."
-          }
-
-          @(
-            "node=$(node --version)"
-            "pnpm=$(pnpm --version)"
-            "electron-builder=$actualBuilder"
-            "electron=$actualElectron"
-          ) | Set-Content validation\dependency-versions.log
-
-      - name: Install locked Electron runtime
+      - name: Install Electron binary
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $stdout = Join-Path $PWD "validation\electron-install.stdout.log"
-          $stderr = Join-Path $PWD "validation\electron-install.stderr.log"
-          $script = Join-Path $PWD "node_modules\electron\install.js"
-          $node = (Get-Command node).Source
-          $process = Start-Process -FilePath $node -ArgumentList @($script) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-          if (Test-Path $stdout) { Get-Content $stdout }
-          if (Test-Path $stderr) { Get-Content $stderr }
-          if ($process.ExitCode -ne 0) {
-            throw "Electron runtime installation failed with exit code $($process.ExitCode)."
-          }
-          $electronExe = Join-Path $PWD "node_modules\electron\dist\electron.exe"
-          if (-not (Test-Path $electronExe -PathType Leaf)) {
-            throw "Electron runtime was not installed: $electronExe"
-          }
+          node node_modules\electron\install.js
+          if ($LASTEXITCODE -ne 0) { throw "Electron installation failed with exit code $LASTEXITCODE." }
+          $electron = Get-ChildItem node_modules\electron\dist -Filter electron.exe -Recurse | Select-Object -First 1
+          if (-not $electron) { throw "electron.exe was not installed." }
 
-      - name: Lint source
+      - name: Lint JavaScript
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $stdout = Join-Path $PWD "validation\lint.stdout.log"
-          $stderr = Join-Path $PWD "validation\lint.stderr.log"
-          $node = (Get-Command node).Source
-          $process = Start-Process -FilePath $node -ArgumentList @("scripts\lint.js") -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-          if (Test-Path $stdout) { Get-Content $stdout }
-          if (Test-Path $stderr) { Get-Content $stderr }
-          if ($process.ExitCode -ne 0) {
-            throw "Lint failed with exit code $($process.ExitCode)."
-          }
+          npm run lint
+          if ($LASTEXITCODE -ne 0) { throw "Lint failed with exit code $LASTEXITCODE." }
 
       - name: Run automated tests
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $testFiles = Get-ChildItem test -Filter *.test.js -File | Sort-Object FullName | ForEach-Object { $_.FullName }
-          if ($testFiles.Count -eq 0) {
-            throw "No automated test files were found."
-          }
-
-          $stdout = Join-Path $PWD "validation\tests.stdout.log"
-          $stderr = Join-Path $PWD "validation\tests.stderr.log"
-          $node = (Get-Command node).Source
-          $arguments = @("--test") + $testFiles
-          $process = Start-Process -FilePath $node -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-          if (Test-Path $stdout) { Get-Content $stdout }
-          if (Test-Path $stderr) { Get-Content $stderr }
-          if ($process.ExitCode -ne 0) {
-            throw "Tests failed with exit code $($process.ExitCode)."
-          }
-
-          $text = Get-Content $stdout -Raw
-          $tests = [regex]::Match($text, '(?m)^# tests\s+(\d+)\s*$')
-          $passed = [regex]::Match($text, '(?m)^# pass\s+(\d+)\s*$')
-          $failed = [regex]::Match($text, '(?m)^# fail\s+(\d+)\s*$')
-          if (-not $tests.Success -or -not $passed.Success -or -not $failed.Success) {
-            throw "Could not prove the Node test totals from TAP output."
-          }
-          if ([int]$tests.Groups[1].Value -lt 141 -or [int]$passed.Groups[1].Value -ne [int]$tests.Groups[1].Value -or [int]$failed.Groups[1].Value -ne 0) {
-            throw "Expected at least 141 passing tests and zero failures."
-          }
-
-          Copy-Item $stdout validation\tests.log -Force
-
-      - name: Build Windows NSIS and portable executables
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          Remove-Item release -Recurse -Force -ErrorAction SilentlyContinue
-
-          $builder = Join-Path $PWD "node_modules\electron-builder\cli.js"
-          $stdout = Join-Path $PWD "validation\windows-build.stdout.log"
-          $stderr = Join-Path $PWD "validation\windows-build.stderr.log"
-          $node = (Get-Command node).Source
-          $arguments = @($builder, "--win", "nsis", "portable", "--publish", "never")
-          $process = Start-Process -FilePath $node -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-
-          if (Test-Path $stdout) { Get-Content $stdout }
-          if (Test-Path $stderr) { Get-Content $stderr }
-
-          $installer = Join-Path $PWD "release\Airmonlink-Composer-1.1.0-Build14-Setup.exe"
-          $portable = Join-Path $PWD "release\Airmonlink-Composer-1.1.0-Build14-Portable.exe"
-          $missing = @()
-          foreach ($artifact in @($installer, $portable)) {
-            if (-not (Test-Path $artifact -PathType Leaf)) {
-              $missing += "$artifact (missing)"
-              continue
-            }
-            if ((Get-Item $artifact).Length -le 0) {
-              $missing += "$artifact (empty)"
-            }
-          }
-
-          if ($missing.Count -gt 0) {
-            throw "Windows packaging did not produce valid expected artifacts. Builder exit code: $($process.ExitCode). Problems: $($missing -join '; ')"
-          }
-
-          if ($process.ExitCode -ne 0) {
-            Write-Warning "electron-builder returned exit code $($process.ExitCode) after producing both expected executables. Continuing to deterministic artifact validation."
-          }
-
-          foreach ($artifact in @($installer, $portable)) {
-            $bytes = [System.IO.File]::ReadAllBytes($artifact)
-            if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) {
-              throw "Generated artifact is not a valid PE file: $artifact"
-            }
-          }
-
-      - name: Validate PE metadata, install, launch, association, and uninstall
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          & .\scripts\windows-release-validation.ps1 *> validation\windows-validation.log
+          New-Item -ItemType Directory -Force validation | Out-Null
+          cmd.exe /d /s /c "npm test > validation\tests.tap 2>&1"
           $exitCode = $LASTEXITCODE
-          Get-Content validation\windows-validation.log
-          if ($exitCode -ne 0) {
-            throw "Windows release validation failed with exit code $exitCode."
-          }
+          Get-Content validation\tests.tap
+          if ($exitCode -ne 0) { throw "Tests failed with exit code $exitCode." }
+          $summary = Select-String -Path validation\tests.tap -Pattern "^# tests (\d+)$" | Select-Object -Last 1
+          if (-not $summary) { throw "TAP test count was not found." }
+          $count = [int]$summary.Matches[0].Groups[1].Value
+          if ($count -lt 150) { throw "Expected at least 150 tests; found $count." }
+          if (Select-String -Path validation\tests.tap -Pattern "^# fail [1-9]") { throw "TAP reported failures." }
 
-      - name: Detect distributables
-        if: always()
-        id: distributables
+      - name: Build Windows installer and portable app
         shell: pwsh
         run: |
-          $installer = Test-Path "release\Airmonlink-Composer-1.1.0-Build14-Setup.exe" -PathType Leaf
-          $portable = Test-Path "release\Airmonlink-Composer-1.1.0-Build14-Portable.exe" -PathType Leaf
-          $checksums = Test-Path "release\SHA256SUMS.txt" -PathType Leaf
-          "present=$($installer -and $portable -and $checksums)".ToLowerInvariant() | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $ErrorActionPreference = "Stop"
+          $builder = Resolve-Path "node_modules\electron-builder\cli.js"
+          cmd.exe /d /s /c "node `"$builder`" --win nsis portable --publish never > validation\windows-build.log 2>&1"
+          $exitCode = $LASTEXITCODE
+          Get-Content validation\windows-build.log
+          if ($exitCode -ne 0) { throw "Windows packaging failed with exit code $exitCode." }
 
-      - name: Upload Windows distributables
-        if: ${{ always() && steps.distributables.outputs.present == 'true' }}
+      - name: Validate Windows release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & .\scripts\windows-release-validation.ps1 -ReleaseDirectory release -ValidationDirectory validation -ExpectedBuild 15
+          if ($LASTEXITCODE -ne 0) { throw "Windows release validation failed with exit code $LASTEXITCODE." }
+
+      - name: Upload Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: Airmonlink-Composer-1.1.0-Build14-Windows
+          name: Airmonlink-Composer-1.1.0-Build15-Windows
           path: |
-            release/Airmonlink-Composer-1.1.0-Build14-Setup.exe
-            release/Airmonlink-Composer-1.1.0-Build14-Portable.exe
+            release/Airmonlink-Composer-1.1.0-Build15-Setup.exe
+            release/Airmonlink-Composer-1.1.0-Build15-Portable.exe
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -229,7 +113,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Airmonlink-Composer-1.1.0-Build14-Windows-Validation
+          name: Airmonlink-Composer-1.1.0-Build15-Windows-Validation
           path: validation/**
           if-no-files-found: warn
           retention-days: 30
