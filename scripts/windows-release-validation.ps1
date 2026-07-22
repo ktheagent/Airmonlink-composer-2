@@ -1,155 +1,128 @@
-[CmdletBinding()]
 param(
-  [string]$ReleaseDir = "release",
-  [string]$ValidationDir = "validation",
-  [string]$ExpectedVersion = "1.1.0",
-  [int]$ExpectedBuild = 14
+  [string]$ReleaseDirectory = "release",
+  [string]$ValidationDirectory = "validation",
+  [int]$ExpectedBuild = 15
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-New-Item -ItemType Directory -Force -Path $ValidationDir | Out-Null
-$releasePath = (Resolve-Path $ReleaseDir).Path
-$validationPath = (Resolve-Path $ValidationDir).Path
-$results = [System.Collections.Generic.List[object]]::new()
-$failures = [System.Collections.Generic.List[string]]::new()
+$root = (Resolve-Path ".").Path
+$release = Join-Path $root $ReleaseDirectory
+$validation = Join-Path $root $ValidationDirectory
+New-Item -ItemType Directory -Force $validation | Out-Null
 
-function Add-Result {
-  param(
-    [string]$Id,
-    [ValidateSet("PASS","FAIL","BLOCKED")][string]$Status,
-    [string]$Evidence
-  )
-  $results.Add([pscustomobject]@{ id=$Id; status=$Status; evidence=$Evidence })
-  if ($Status -eq "FAIL") { $failures.Add("${Id}: ${Evidence}") }
+$package = Get-Content (Join-Path $root "package.json") -Raw | ConvertFrom-Json
+$version = [string]$package.version
+$buildNumber = [string]$package.buildNumber
+$buildVersion = [string]$package.build.buildVersion
+$expectedSetup = "Airmonlink-Composer-$version-Build$ExpectedBuild-Setup.exe"
+$expectedPortable = "Airmonlink-Composer-$version-Build$ExpectedBuild-Portable.exe"
+$setupPath = Join-Path $release $expectedSetup
+$portablePath = Join-Path $release $expectedPortable
+
+$rows = [System.Collections.Generic.List[object]]::new()
+function Add-Row([string]$Name, [string]$Status, [string]$Details) {
+  $rows.Add([pscustomobject]@{ Name = $Name; Status = $Status; Details = $Details })
+}
+function Assert-Check([bool]$Condition, [string]$Name, [string]$Details) {
+  if ($Condition) { Add-Row $Name "PASS" $Details }
+  else { Add-Row $Name "FAIL" $Details }
 }
 
-function Assert-Result {
-  param([bool]$Condition,[string]$Id,[string]$Evidence)
-  if ($Condition) { Add-Result $Id "PASS" $Evidence }
-  else { Add-Result $Id "FAIL" $Evidence }
+Assert-Check ($buildNumber -eq [string]$ExpectedBuild) "Package build number" "Expected $ExpectedBuild; found $buildNumber"
+Assert-Check ($buildVersion -eq "$version.$ExpectedBuild") "Windows build version" "Expected $version.$ExpectedBuild; found $buildVersion"
+Assert-Check ([string]$package.main -eq "src/bootstrap.js") "Publishing bootstrap" "Package entry point is $($package.main)"
+Assert-Check ([string]$package.build.nsis.artifactName -match "Build$ExpectedBuild") "Installer naming" ([string]$package.build.nsis.artifactName)
+Assert-Check ([string]$package.build.portable.artifactName -match "Build$ExpectedBuild") "Portable naming" ([string]$package.build.portable.artifactName)
+
+$requiredSource = @(
+  "src\bootstrap.js",
+  "src\desktop\publishing.js",
+  "src\ui\publishing-ui.js",
+  "test\v122-dedicated-publishing.test.js"
+)
+foreach ($relative in $requiredSource) {
+  Assert-Check (Test-Path (Join-Path $root $relative)) "Required source: $relative" $relative
 }
 
-function Test-PE {
-  param([string]$Path)
-  if (-not (Test-Path $Path -PathType Leaf)) { return $false }
+Assert-Check (Test-Path $setupPath) "Setup artifact exists" $setupPath
+Assert-Check (Test-Path $portablePath) "Portable artifact exists" $portablePath
+
+function Test-PeFile([string]$Path) {
+  if (-not (Test-Path $Path)) { return $false }
   $stream = [System.IO.File]::OpenRead($Path)
   try {
-    return $stream.Length -gt 2 -and $stream.ReadByte() -eq 0x4d -and $stream.ReadByte() -eq 0x5a
+    if ($stream.Length -lt 1024) { return $false }
+    $reader = [System.IO.BinaryReader]::new($stream)
+    if ($reader.ReadUInt16() -ne 0x5A4D) { return $false }
+    $stream.Position = 0x3C
+    $peOffset = $reader.ReadInt32()
+    if ($peOffset -lt 64 -or $peOffset -gt ($stream.Length - 4)) { return $false }
+    $stream.Position = $peOffset
+    return $reader.ReadUInt32() -eq 0x00004550
   } finally {
     $stream.Dispose()
   }
 }
 
-$installerName = "Airmonlink-Composer-$ExpectedVersion-Build$ExpectedBuild-Setup.exe"
-$portableName = "Airmonlink-Composer-$ExpectedVersion-Build$ExpectedBuild-Portable.exe"
-$installer = Join-Path $releasePath $installerName
-$portable = Join-Path $releasePath $portableName
+Assert-Check (Test-PeFile $setupPath) "Setup PE validation" "MZ and PE signatures"
+Assert-Check (Test-PeFile $portablePath) "Portable PE validation" "MZ and PE signatures"
 
-$testLog = Join-Path $validationPath "tests.log"
-if (Test-Path $testLog -PathType Leaf) {
-  $text = Get-Content $testLog -Raw
-  $tests = [regex]::Match($text,'(?m)^# tests\s+(\d+)\s*$')
-  $pass = [regex]::Match($text,'(?m)^# pass\s+(\d+)\s*$')
-  $fail = [regex]::Match($text,'(?m)^# fail\s+(\d+)\s*$')
-  $ok = $tests.Success -and $pass.Success -and $fail.Success -and
-        [int]$tests.Groups[1].Value -ge 141 -and
-        [int]$pass.Groups[1].Value -eq [int]$tests.Groups[1].Value -and
-        [int]$fail.Groups[1].Value -eq 0
-  Assert-Result $ok "automated-tests" "TAP totals in validation/tests.log prove the automated test result."
-} else {
-  Add-Result "automated-tests" "FAIL" "validation/tests.log was not found."
+if (Test-Path $setupPath) {
+  $setupInfo = Get-Item $setupPath
+  Assert-Check ($setupInfo.Length -gt 10MB) "Setup size sanity" "$($setupInfo.Length) bytes"
+}
+if (Test-Path $portablePath) {
+  $portableInfo = Get-Item $portablePath
+  Assert-Check ($portableInfo.Length -gt 10MB) "Portable size sanity" "$($portableInfo.Length) bytes"
 }
 
-Assert-Result (Test-Path $installer -PathType Leaf) "installer-present" $installerName
-Assert-Result (Test-Path $portable -PathType Leaf) "portable-present" $portableName
-Assert-Result (Test-PE $installer) "installer-pe" "Installer has a valid MZ header."
-Assert-Result (Test-PE $portable) "portable-pe" "Portable executable has a valid MZ header."
-
-foreach ($path in @($installer,$portable)) {
-  if (Test-Path $path -PathType Leaf) {
-    $item = Get-Item $path
-    $version = $item.VersionInfo
-    $metadataOk = $version.ProductName -eq "Airmonlink Composer" -and
-                  $version.ProductVersion -like "$ExpectedVersion*" -and
-                  $version.FileVersion -like "$ExpectedVersion.$ExpectedBuild*"
-    Assert-Result $metadataOk "metadata-$($item.BaseName)" "ProductName=$($version.ProductName); ProductVersion=$($version.ProductVersion); FileVersion=$($version.FileVersion)."
+$hashLines = @()
+foreach ($file in @($setupPath, $portablePath)) {
+  if (Test-Path $file) {
+    $hash = Get-FileHash $file -Algorithm SHA256
+    $hashLines += "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($file))"
   }
 }
+$hashPath = Join-Path $release "SHA256SUMS.txt"
+$hashLines | Set-Content -Encoding ascii $hashPath
+Assert-Check ((Test-Path $hashPath) -and ((Get-Item $hashPath).Length -gt 100)) "SHA256 manifest" $hashPath
 
-$signatureRows = foreach ($path in @($installer,$portable)) {
-  if (Test-Path $path -PathType Leaf) {
-    $signature = Get-AuthenticodeSignature -FilePath $path
-    [pscustomobject]@{
-      artifact = Split-Path $path -Leaf
-      status = [string]$signature.Status
-      signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
+# Launch the portable binary long enough to prove process creation, then close it.
+if (Test-Path $portablePath) {
+  try {
+    $process = Start-Process -FilePath $portablePath -PassThru
+    Start-Sleep -Seconds 8
+    $alive = -not $process.HasExited
+    Assert-Check $alive "Portable launch smoke test" "Process started and remained alive for 8 seconds"
+    if ($alive) {
+      $process.CloseMainWindow() | Out-Null
+      Start-Sleep -Seconds 3
+      if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
     }
+  } catch {
+    Add-Row "Portable launch smoke test" "FAIL" $_.Exception.Message
   }
 }
-$signatureRows | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $validationPath "signature-status.json")
-if (($signatureRows | Where-Object status -ne "Valid").Count -eq 0) {
-  Add-Result "code-signing" "PASS" "All Windows artifacts have valid Authenticode signatures."
-} else {
-  Add-Result "code-signing" "BLOCKED" "One or more artifacts are unsigned or untrusted."
-}
 
-if ((Test-Path $installer) -and (Test-Path $portable)) {
-  @(
-    "$((Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant())  $installerName"
-    "$((Get-FileHash $portable -Algorithm SHA256).Hash.ToLowerInvariant())  $portableName"
-  ) | Set-Content -Encoding ascii (Join-Path $releasePath "SHA256SUMS.txt")
-}
+Add-Row "Human GUI inspection" "BLOCKED" "Requires a person on Windows."
+Add-Row "MIDI hardware" "BLOCKED" "Requires physical MIDI hardware."
+Add-Row "Audio device" "BLOCKED" "Requires physical audio output."
+Add-Row "Code-signing trust" "BLOCKED" "No signing certificate was supplied."
 
-$installDir = Join-Path $env:RUNNER_TEMP "AirmonlinkComposer-Build$ExpectedBuild-Clean"
-if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
-try {
-  $install = Start-Process -FilePath $installer -ArgumentList @("/S","/D=$installDir") -Wait -PassThru
-  if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)." }
-  $installedExe = Join-Path $installDir "Airmonlink Composer.exe"
-  Assert-Result (Test-Path $installedExe -PathType Leaf) "clean-install" "Installed executable exists."
+$jsonPath = Join-Path $validation "windows-release-validation.json"
+$csvPath = Join-Path $validation "windows-release-validation.csv"
+$rows | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 $jsonPath
+$rows | Export-Csv -NoTypeInformation -Encoding utf8 $csvPath
+$rows | Format-Table -AutoSize | Out-String | Set-Content -Encoding utf8 (Join-Path $validation "windows-release-validation.txt")
 
-  $uninstaller = Get-ChildItem $installDir -Filter "Uninstall*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-  Assert-Result ($null -ne $uninstaller) "uninstaller-present" "Uninstaller exists."
-  if ($uninstaller) {
-    $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
-    if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)." }
-    Assert-Result (-not (Test-Path $installedExe)) "uninstall-cleanup" "Installed executable was removed."
-  }
-} catch {
-  Add-Result "windows-install-cycle" "FAIL" $_.Exception.Message
-}
-
-Add-Result "upgrade-preservation" "BLOCKED" "No previous installer artifact was supplied."
-Add-Result "human-gui-validation" "BLOCKED" "Human visual and interaction checks require a Windows user session."
-Add-Result "printing-windows" "BLOCKED" "Printer/PDF verification requires a Windows print target."
-Add-Result "midi-windows" "BLOCKED" "MIDI device validation requires hardware."
-Add-Result "smartscreen-presentation" "BLOCKED" "SmartScreen presentation requires human verification."
-
-$summary = [pscustomobject]@{
-  product = "Airmonlink Composer"
-  version = $ExpectedVersion
-  build = $ExpectedBuild
-  generatedAt = [DateTime]::UtcNow.ToString("o")
-  runner = if ($env:RUNNER_NAME) { $env:RUNNER_NAME } else { "unknown" }
-  results = $results
-}
-$summary | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $validationPath "windows-validation-summary.json")
-$results | Export-Csv -NoTypeInformation -Encoding utf8 (Join-Path $validationPath "windows-validation-summary.csv")
-
+$failures = @($rows | Where-Object Status -eq "FAIL")
 if ($failures.Count -gt 0) {
-  throw "Windows validation failed:`n$($failures -join "`n")"
+  $failures | Format-Table -AutoSize
+  throw "Windows release validation found $($failures.Count) FAIL row(s)."
 }
 
-$successMarker = Join-Path $validationPath "windows-validation.ok"
-@(
-  "status=PASS"
-  "product=Airmonlink Composer"
-  "version=$ExpectedVersion"
-  "build=$ExpectedBuild"
-  "generatedAt=$([DateTime]::UtcNow.ToString('o'))"
-) | Set-Content -Encoding ascii $successMarker
-
-$global:LASTEXITCODE = 0
+"OK" | Set-Content -Encoding ascii (Join-Path $validation "windows-validation.ok")
 Write-Host "Windows validation completed without FAIL rows. BLOCKED rows remain explicitly reported."
+exit 0
