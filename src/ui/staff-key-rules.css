@@ -1,0 +1,10 @@
+/* Staff scores use engraved key signatures only; textual tonic declarations belong to Tonic Sol-fa. */
+#pageMusicalMeta [data-header-edit="key"] {
+  display: none !important;
+}
+
+@media print {
+  #pageMusicalMeta [data-header-edit="key"] {
+    display: none !important;
+  }
+}
