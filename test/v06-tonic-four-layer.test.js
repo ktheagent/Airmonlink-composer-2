@@ -127,7 +127,7 @@ test('traditional tonic sol-fa uses rhythm punctuation and no raw accidental sym
   model.addNote(score, part.id, { midi: 62, start: .5, duration: 1.5, voice: 1 });
   const text = solfa.scoreToSolfaText(score);
   assert.match(text, /di/);
-  assert.match(text, /[.:,—]/);
+  assert.match(text, /[,:,—]/);
   assert.doesNotMatch(text, /[#♯♭]/);
 });
 
@@ -157,14 +157,14 @@ test('MIDI step-time entry records notes and chords in the active layer', () => 
   assert.deepEqual(authored(part, 'note').map(event => [event.midi, event.velocity]).sort((a, b) => a[0] - b[0]), [[60, 90], [64, 80]]);
 });
 
-test('airscore v8 preserves four layers, spanners and traditional sol-fa settings', () => {
+test('current airscore schema preserves four layers, spanners and traditional sol-fa settings', () => {
   const score = model.createScore({ template: 'lead', measures: 1, autoFillRests: false });
   const part = score.parts[0];
   const a = model.addNote(score, part.id, { midi: 60, start: 0, duration: 1, voice: 4 });
   const b = model.addNote(score, part.id, { midi: 60, start: 1, duration: 1, voice: 4 });
   model.addTie(score, a.id, b.id);
   const payload = JSON.parse(airscore.serialize(score));
-  assert.equal(payload.schema, 'airscore-v9');
+  assert.equal(payload.schema, 'airscore-v10');
   const reopened = airscore.deserialize(payload);
   assert.deepEqual(reopened.parts[0].voiceLayers, [1, 2, 3, 4]);
   assert.equal(reopened.spanners.length, 1);
