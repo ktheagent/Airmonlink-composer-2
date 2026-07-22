@@ -57,30 +57,49 @@ jobs:
           Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_PRODUCTION -ErrorAction SilentlyContinue
           Remove-Item Env:NPM_CONFIG_OMIT -ErrorAction SilentlyContinue
-          if (Test-Path node_modules) { Remove-Item node_modules -Recurse -Force }
-          if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml -Force }
+          if (Test-Path node_modules) {
+            Remove-Item node_modules -Recurse -Force
+          }
+          if (Test-Path pnpm-lock.yaml) {
+            Remove-Item pnpm-lock.yaml -Force
+          }
           pnpm import
-          if ($LASTEXITCODE -ne 0) { throw "pnpm import failed with exit code $LASTEXITCODE." }
+          if ($LASTEXITCODE -ne 0) {
+            throw "pnpm import failed with exit code $LASTEXITCODE."
+          }
           pnpm install --frozen-lockfile --ignore-scripts
-          if ($LASTEXITCODE -ne 0) { throw "pnpm install failed with exit code $LASTEXITCODE." }
-          if (-not (Test-Path "node_modules\electron-builder\cli.js")) { throw "electron-builder CLI is missing." }
-          if (-not (Test-Path "node_modules\electron\install.js")) { throw "Electron install script is missing." }
+          if ($LASTEXITCODE -ne 0) {
+            throw "pnpm install failed with exit code $LASTEXITCODE."
+          }
+          if (-not (Test-Path "node_modules\electron-builder\cli.js")) {
+            throw "electron-builder CLI is missing."
+          }
+          if (-not (Test-Path "node_modules\electron\install.js")) {
+            throw "Electron install script is missing."
+          }
 
       - name: Install Electron binary
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           node node_modules\electron\install.js
-          if ($LASTEXITCODE -ne 0) { throw "Electron installation failed with exit code $LASTEXITCODE." }
-          $electron = Get-ChildItem node_modules\electron\dist -Filter electron.exe -Recurse | Select-Object -First 1
-          if (-not $electron) { throw "electron.exe was not installed." }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Electron installation failed with exit code $LASTEXITCODE."
+          }
+          $electron = Get-ChildItem node_modules\electron\dist -Filter electron.exe -Recurse |
+            Select-Object -First 1
+          if (-not $electron) {
+            throw "electron.exe was not installed."
+          }
 
       - name: Lint JavaScript
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           npm run lint
-          if ($LASTEXITCODE -ne 0) { throw "Lint failed with exit code $LASTEXITCODE." }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Lint failed with exit code $LASTEXITCODE."
+          }
 
       - name: Run automated tests
         shell: pwsh
@@ -90,12 +109,21 @@ jobs:
           cmd.exe /d /s /c "npm test > validation\tests.tap 2>&1"
           $exitCode = $LASTEXITCODE
           Get-Content validation\tests.tap
-          if ($exitCode -ne 0) { throw "Tests failed with exit code $exitCode." }
-          $summary = Select-String -Path validation\tests.tap -Pattern "^# tests (\d+)$" | Select-Object -Last 1
-          if (-not $summary) { throw "TAP test count was not found." }
+          if ($exitCode -ne 0) {
+            throw "Tests failed with exit code $exitCode."
+          }
+          $summary = Select-String -Path validation\tests.tap -Pattern "^# tests (\d+)$" |
+            Select-Object -Last 1
+          if (-not $summary) {
+            throw "TAP test count was not found."
+          }
           $count = [int]$summary.Matches[0].Groups[1].Value
-          if ($count -lt 152) { throw "Expected at least 152 tests; found $count." }
-          if (Select-String -Path validation\tests.tap -Pattern "^# fail [1-9]") { throw "TAP reported failures." }
+          if ($count -lt 160) {
+            throw "Expected at least 160 tests; found $count."
+          }
+          if (Select-String -Path validation\tests.tap -Pattern "^# fail [1-9]") {
+            throw "TAP reported failures."
+          }
 
       - name: Build Windows installer and portable app
         shell: pwsh
@@ -105,22 +133,29 @@ jobs:
           cmd.exe /d /s /c "node `"$builder`" --win nsis portable --publish never > validation\windows-build.log 2>&1"
           $exitCode = $LASTEXITCODE
           Get-Content validation\windows-build.log
-          if ($exitCode -ne 0) { throw "Windows packaging failed with exit code $exitCode." }
+          if ($exitCode -ne 0) {
+            throw "Windows packaging failed with exit code $exitCode."
+          }
 
-      - name: Validate Windows release
+      - name: Validate Windows release and live publishing controls
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          & .\scripts\windows-release-validation.ps1 -ReleaseDir release -ValidationDir validation -ExpectedBuild 16
-          if ($LASTEXITCODE -ne 0) { throw "Windows release validation failed with exit code $LASTEXITCODE." }
+          & .\scripts\windows-release-validation.ps1 `
+            -ReleaseDirectory release `
+            -ValidationDirectory validation `
+            -ExpectedBuild 17
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows release validation failed with exit code $LASTEXITCODE."
+          }
 
       - name: Upload Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: Airmonlink-Composer-1.1.0-Build16-Windows
+          name: Airmonlink-Composer-1.1.0-Build17-Windows
           path: |
-            release/Airmonlink-Composer-1.1.0-Build16-Setup.exe
-            release/Airmonlink-Composer-1.1.0-Build16-Portable.exe
+            release/Airmonlink-Composer-1.1.0-Build17-Setup.exe
+            release/Airmonlink-Composer-1.1.0-Build17-Portable.exe
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -129,7 +164,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Airmonlink-Composer-1.1.0-Build16-Windows-Validation
+          name: Airmonlink-Composer-1.1.0-Build17-Windows-Validation
           path: validation/**
           if-no-files-found: warn
           retention-days: 30
